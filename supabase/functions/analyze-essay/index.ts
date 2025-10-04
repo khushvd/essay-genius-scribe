@@ -136,6 +136,7 @@ ${JSON.stringify(essay.key_strategies, null, 2)}
 
 Style Guidelines:
 - ${englishVariant === 'british' ? 'British' : 'American'} English spelling and grammar
+- Humanised, conversational tone - avoid overly formal or robotic language
 - NO em dashes (—) - use commas, periods, or semicolons instead
 - Short, punchy sentences
 - Active voice preferred
@@ -158,10 +159,10 @@ ${cvData ? `\nWRITER'S CV DATA:\n${JSON.stringify(cvData, null, 2)}\n` : ''}
 ESSAY TO ANALYZE:
 ${content}
 
-Please analyze this essay and provide editorial feedback. For each suggestion, identify:
+Please analyze this essay and provide editorial feedback with a humanised, conversational tone. For each suggestion, identify:
 - The exact text that needs attention (with character positions)
 - What the issue is
-- A specific suggested rewrite
+- A specific suggested rewrite (ensure it sounds natural and human, not robotic)
 - Why this matters (based on successful essay patterns)
 - Evidence from the successful essays that supports this recommendation`;
 
