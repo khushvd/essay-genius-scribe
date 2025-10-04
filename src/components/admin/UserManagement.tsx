@@ -90,8 +90,10 @@ export const UserManagement = () => {
   const handleRoleChange = async (userId: string, newRole: 'free' | 'premium' | 'admin') => {
     setUpdatingUserId(userId);
     
-    // Optimistic update
+    // Store old role for rollback
     const previousUsers = [...users];
+    
+    // Optimistic update
     setUsers(prevUsers =>
       prevUsers.map(user =>
         user.id === userId ? { ...user, role: newRole, user_roles: [{ role: newRole }] } : user
@@ -109,25 +111,6 @@ export const UserManagement = () => {
         // Rollback on error
         setUsers(previousUsers);
         toast.error('Failed to update role: ' + error.message);
-        setUpdatingUserId(null);
-        return;
-      }
-
-      // Verify the update
-      const { data: updatedRole, error: verifyError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (verifyError || !updatedRole) {
-        console.error('Error verifying role update:', verifyError);
-        setUsers(previousUsers);
-        toast.error('Failed to verify role update');
-      } else if (updatedRole.role !== newRole) {
-        console.error('Role mismatch after update');
-        setUsers(previousUsers);
-        toast.error('Role update verification failed');
       } else {
         toast.success(`Role updated to ${newRole}`);
       }

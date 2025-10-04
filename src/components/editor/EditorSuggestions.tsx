@@ -29,6 +29,7 @@ interface EditorSuggestionsProps {
   onApplySuggestion: (suggestion: Suggestion) => void;
   collegeName?: string;
   programmeName?: string;
+  onSuggestionsUpdate?: (suggestions: Suggestion[]) => void;
 }
 
 const EditorSuggestions = ({
@@ -41,6 +42,7 @@ const EditorSuggestions = ({
   onApplySuggestion,
   collegeName,
   programmeName,
+  onSuggestionsUpdate,
 }: EditorSuggestionsProps) => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -91,6 +93,7 @@ const EditorSuggestions = ({
 
       if (data?.suggestions) {
         setSuggestions(data.suggestions);
+        onSuggestionsUpdate?.(data.suggestions);
         setAnalysisId(data.analysisId || `analysis-${Date.now()}`);
         toast.success(`Found ${data.suggestions.length} editorial suggestions`);
       } else {
