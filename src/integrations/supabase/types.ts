@@ -219,24 +219,41 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_status: Database["public"]["Enums"]["account_status"]
+          approved_at: string | null
+          approved_by: string | null
           created_at: string | null
           email: string
           full_name: string
           id: string
         }
         Insert: {
+          account_status?: Database["public"]["Enums"]["account_status"]
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string | null
           email: string
           full_name: string
           id: string
         }
         Update: {
+          account_status?: Database["public"]["Enums"]["account_status"]
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string | null
           email?: string
           full_name?: string
           id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       programmes: {
         Row: {
@@ -327,6 +344,78 @@ export type Database = {
           },
         ]
       }
+      training_essays: {
+        Row: {
+          added_at: string | null
+          added_by: string | null
+          admin_notes: string | null
+          after_score: Json | null
+          before_score: Json | null
+          created_at: string | null
+          essay_id: string
+          final_content: string
+          id: string
+          improvement_metrics: Json | null
+          manual_edits: Json | null
+          metadata: Json | null
+          original_content: string
+          status: string | null
+          suggestions_applied: Json | null
+          suggestions_dismissed: Json | null
+        }
+        Insert: {
+          added_at?: string | null
+          added_by?: string | null
+          admin_notes?: string | null
+          after_score?: Json | null
+          before_score?: Json | null
+          created_at?: string | null
+          essay_id: string
+          final_content: string
+          id?: string
+          improvement_metrics?: Json | null
+          manual_edits?: Json | null
+          metadata?: Json | null
+          original_content: string
+          status?: string | null
+          suggestions_applied?: Json | null
+          suggestions_dismissed?: Json | null
+        }
+        Update: {
+          added_at?: string | null
+          added_by?: string | null
+          admin_notes?: string | null
+          after_score?: Json | null
+          before_score?: Json | null
+          created_at?: string | null
+          essay_id?: string
+          final_content?: string
+          id?: string
+          improvement_metrics?: Json | null
+          manual_edits?: Json | null
+          metadata?: Json | null
+          original_content?: string
+          status?: string | null
+          suggestions_applied?: Json | null
+          suggestions_dismissed?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_essays_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_essays_essay_id_fkey"
+            columns: ["essay_id"]
+            isOneToOne: false
+            referencedRelation: "essays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -366,6 +455,7 @@ export type Database = {
       }
     }
     Enums: {
+      account_status: "pending" | "approved" | "suspended" | "rejected"
       app_role: "free" | "premium" | "admin"
       degree_level: "bachelors" | "masters"
       english_variant: "british" | "american"
@@ -497,6 +587,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_status: ["pending", "approved", "suspended", "rejected"],
       app_role: ["free", "premium", "admin"],
       degree_level: ["bachelors", "masters"],
       english_variant: ["british", "american"],
