@@ -23,20 +23,37 @@ export const UserManagement = () => {
   }, []);
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch profiles first
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles (
-            role
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setUsers(data || []);
-      setFilteredUsers(data || []);
+      if (profilesError) throw profilesError;
+
+      // Fetch all user roles separately
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) throw rolesError;
+
+      // Create a map of user_id to role for quick lookup
+      const rolesMap = new Map(
+        rolesData?.map(r => [r.user_id, r.role]) || []
+      );
+
+      // Combine profiles with their roles
+      const usersWithRoles = profilesData?.map(profile => ({
+        ...profile,
+        role: rolesMap.get(profile.id) || 'free',
+        user_roles: [{ role: rolesMap.get(profile.id) || 'free' }]
+      })) || [];
+
+      setUsers(usersWithRoles);
+      setFilteredUsers(usersWithRoles);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error("Failed to load users");
@@ -71,8 +88,11 @@ export const UserManagement = () => {
 
   const handleRoleChange = async (userId: string, newRole: 'free' | 'premium' | 'admin') => {
     try {
-      await supabase.from('user_roles').delete().eq('user_id', userId);
-      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: newRole });
+      const { error } = await supabase
+        .from('user_roles')
+        .update({ role: newRole })
+        .eq('user_id', userId);
+      
       if (error) throw error;
       toast.success(`Role updated to ${newRole}`);
       fetchUsers();

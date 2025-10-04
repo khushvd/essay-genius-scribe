@@ -17,13 +17,16 @@ export const useUserRole = (userId: string | undefined) => {
           .from('user_roles')
           .select('role')
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Error fetching user role:', error);
-          setRole('free'); // Default to free if error
+          setRole('free');
+        } else if (!data) {
+          console.log('No role found for user, defaulting to free');
+          setRole('free');
         } else {
-          setRole(data?.role || 'free');
+          setRole(data.role);
         }
       } catch (err) {
         console.error('Error in fetchRole:', err);

@@ -77,6 +77,51 @@ const Editor = () => {
     setContent(newContent);
   };
 
+  const handleExportAsWord = async () => {
+    if (!essay) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('export-essay-docx', {
+        body: { essayId: essay.id }
+      });
+
+      if (error) throw error;
+
+      // Create blob and download
+      const blob = new Blob([data.content], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${essay.title || 'essay'}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Essay exported successfully");
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error("Failed to export essay");
+    }
+  };
+
+  const handleMarkComplete = async () => {
+    if (!essay) return;
+
+    try {
+      const { error } = await supabase.functions.invoke('create-training-snapshot', {
+        body: { essayId: essay.id }
+      });
+
+      if (error) throw error;
+
+      toast.success("Training snapshot created successfully");
+    } catch (error) {
+      console.error('Mark complete error:', error);
+      toast.error("Failed to create snapshot");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
@@ -113,6 +158,12 @@ const Editor = () => {
               <Badge variant="secondary">
                 {essay.programmes?.english_variant === "british" ? "British" : "American"} English
               </Badge>
+              <Button onClick={handleExportAsWord} variant="outline" size="sm">
+                Export
+              </Button>
+              <Button onClick={handleMarkComplete} variant="outline" size="sm">
+                Mark Complete
+              </Button>
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="w-4 h-4 mr-2" />
                 {saving ? "Saving..." : "Save"}
