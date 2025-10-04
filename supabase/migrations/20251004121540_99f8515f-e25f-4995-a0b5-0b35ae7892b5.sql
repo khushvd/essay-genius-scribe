@@ -1,0 +1,60 @@
+-- Add tier column to colleges table
+ALTER TABLE colleges 
+ADD COLUMN tier text DEFAULT 'standard' 
+CHECK (tier IN ('premium', 'standard'));
+
+-- Update top 50 colleges to 'premium' tier
+UPDATE colleges 
+SET tier = 'premium' 
+WHERE name IN (
+  'Harvard University',
+  'Stanford University',
+  'Massachusetts Institute of Technology',
+  'Yale University',
+  'Princeton University',
+  'Columbia University',
+  'University of Pennsylvania',
+  'Duke University',
+  'Northwestern University',
+  'Johns Hopkins University',
+  'California Institute of Technology',
+  'Dartmouth College',
+  'Brown University',
+  'Vanderbilt University',
+  'Rice University',
+  'University of Notre Dame',
+  'University of California, Los Angeles',
+  'University of California, Berkeley',
+  'Carnegie Mellon University',
+  'University of Virginia',
+  'University of Southern California',
+  'University of Michigan',
+  'Wake Forest University',
+  'New York University',
+  'University of North Carolina at Chapel Hill',
+  'University of Rochester',
+  'Georgia Institute of Technology',
+  'University of California, San Diego',
+  'University of Florida',
+  'University of California, Irvine',
+  'Boston College',
+  'College of William & Mary',
+  'University of California, Davis',
+  'University of California, Santa Barbara',
+  'Boston University',
+  'Brandeis University',
+  'Case Western Reserve University',
+  'Tulane University',
+  'University of Texas at Austin',
+  'University of Washington',
+  'University of Wisconsin-Madison',
+  'University of Illinois Urbana-Champaign',
+  'University of Miami',
+  'Pepperdine University',
+  'University of Georgia',
+  'Ohio State University',
+  'Purdue University',
+  'University of Connecticut',
+  'University of Maryland',
+  'Syracuse University'
+);

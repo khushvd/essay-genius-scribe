@@ -7,6 +7,64 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to call Claude API
+async function callClaudeAPI(systemPrompt: string, userPrompt: string, tools: any[]) {
+  const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY not configured');
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      tools: tools.map(t => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters
+      })),
+      tool_choice: { type: 'tool', name: 'provide_editorial_feedback' }
+    }),
+  });
+
+  return response;
+}
+
+// Helper function to call Gemini API via Lovable AI Gateway
+async function callGeminiAPI(systemPrompt: string, userPrompt: string, tools: any[]) {
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
+  }
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      tools: tools,
+      tool_choice: { type: 'function', function: { name: 'provide_editorial_feedback' } }
+    }),
+  });
+
+  return response;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -26,6 +84,22 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch college tier for AI model selection
+    let collegeTier = 'standard';
+    if (collegeId) {
+      const { data: collegeData, error: collegeError } = await supabase
+        .from('colleges')
+        .select('tier')
+        .eq('id', collegeId)
+        .single();
+      
+      if (collegeError) {
+        console.error('Error fetching college tier:', collegeError);
+      } else {
+        collegeTier = collegeData?.tier || 'standard';
+      }
+    }
 
     // Fetch successful essays only if college and programme are provided
     let ragContext = 'No specific college/programme context provided. Providing general editorial guidance based on best practices for college essays.';
@@ -91,71 +165,80 @@ Please analyze this essay and provide editorial feedback. For each suggestion, i
 - Why this matters (based on successful essay patterns)
 - Evidence from the successful essays that supports this recommendation`;
 
-    // Call Lovable AI with tool calling for structured output
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'provide_editorial_feedback',
-              description: 'Return editorial feedback suggestions for the essay',
-              parameters: {
-                type: 'object',
-                properties: {
-                  suggestions: {
-                    type: 'array',
-                    items: {
+    // Define tools schema for both APIs
+    const tools = [
+      {
+        type: 'function',
+        function: {
+          name: 'provide_editorial_feedback',
+          description: 'Return editorial feedback suggestions for the essay',
+          parameters: {
+            type: 'object',
+            properties: {
+              suggestions: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    type: {
+                      type: 'string',
+                      enum: ['critical', 'enhancement', 'personalization'],
+                      description: 'Type of suggestion'
+                    },
+                    location: {
                       type: 'object',
                       properties: {
-                        type: {
-                          type: 'string',
-                          enum: ['critical', 'enhancement', 'personalization'],
-                          description: 'Type of suggestion'
-                        },
-                        location: {
-                          type: 'object',
-                          properties: {
-                            start: { type: 'number' },
-                            end: { type: 'number' }
-                          },
-                          required: ['start', 'end']
-                        },
-                        originalText: { type: 'string' },
-                        issue: { type: 'string' },
-                        suggestion: { type: 'string' },
-                        reasoning: { type: 'string' },
-                        evidence: { type: 'string' }
+                        start: { type: 'number' },
+                        end: { type: 'number' }
                       },
-                      required: ['type', 'location', 'originalText', 'issue', 'suggestion', 'reasoning', 'evidence'],
-                      additionalProperties: false
-                    }
-                  }
-                },
-                required: ['suggestions'],
-                additionalProperties: false
+                      required: ['start', 'end']
+                    },
+                    originalText: { type: 'string' },
+                    issue: { type: 'string' },
+                    suggestion: { type: 'string' },
+                    reasoning: { type: 'string' },
+                    evidence: { type: 'string' }
+                  },
+                  required: ['type', 'location', 'originalText', 'issue', 'suggestion', 'reasoning', 'evidence'],
+                  additionalProperties: false
+                }
               }
-            }
+            },
+            required: ['suggestions'],
+            additionalProperties: false
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'provide_editorial_feedback' } }
-      }),
-    });
+        }
+      }
+    ];
+
+    // Determine which AI to use based on college tier
+    const useClaude = collegeTier === 'premium';
+    console.log(`Using ${useClaude ? 'Claude Sonnet 4' : 'Gemini 2.5 Flash'} for college tier: ${collegeTier}`);
+
+    let aiResponse;
+    let usingFallback = false;
+    let modelUsed = useClaude ? 'claude-sonnet-4' : 'gemini-2.5-flash';
+
+    try {
+      if (useClaude) {
+        aiResponse = await callClaudeAPI(systemPrompt, userPrompt, tools);
+        
+        // If Claude fails, fallback to Gemini
+        if (!aiResponse.ok) {
+          console.warn('Claude API failed, falling back to Gemini:', aiResponse.status);
+          usingFallback = true;
+          modelUsed = 'gemini-2.5-flash (fallback)';
+          aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+        }
+      } else {
+        aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+      }
+    } catch (error) {
+      console.error('Primary AI call failed, attempting fallback:', error);
+      usingFallback = true;
+      modelUsed = 'gemini-2.5-flash (fallback)';
+      aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+    }
 
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
@@ -176,14 +259,26 @@ Please analyze this essay and provide editorial feedback. For each suggestion, i
     }
 
     const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     
-    if (!toolCall) {
-      console.error('No tool call in AI response:', JSON.stringify(aiData));
-      throw new Error('Invalid AI response format');
+    // Parse response based on which API was used
+    let feedbackData;
+    if (useClaude && !usingFallback) {
+      // Claude format: content[].input
+      const toolUse = aiData.content?.find((c: any) => c.type === 'tool_use');
+      if (!toolUse) {
+        console.error('No tool use in Claude response:', JSON.stringify(aiData));
+        throw new Error('Invalid Claude response format');
+      }
+      feedbackData = toolUse.input;
+    } else {
+      // Gemini format: tool_calls[].function.arguments
+      const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall) {
+        console.error('No tool call in Gemini response:', JSON.stringify(aiData));
+        throw new Error('Invalid Gemini response format');
+      }
+      feedbackData = JSON.parse(toolCall.function.arguments);
     }
-
-    const feedbackData = JSON.parse(toolCall.function.arguments);
     
     // Add unique IDs to suggestions
     const suggestionsWithIds = feedbackData.suggestions.map((s: any, idx: number) => ({
@@ -192,7 +287,13 @@ Please analyze this essay and provide editorial feedback. For each suggestion, i
     }));
 
     return new Response(
-      JSON.stringify({ suggestions: suggestionsWithIds }),
+      JSON.stringify({ 
+        suggestions: suggestionsWithIds,
+        metadata: {
+          model: modelUsed,
+          collegeTier
+        }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
