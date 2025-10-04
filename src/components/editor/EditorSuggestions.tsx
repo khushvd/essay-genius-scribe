@@ -26,6 +26,8 @@ interface EditorSuggestionsProps {
   cvData: any;
   englishVariant: "british" | "american";
   onApplySuggestion: (suggestion: Suggestion) => void;
+  collegeName?: string;
+  programmeName?: string;
 }
 
 const EditorSuggestions = ({
@@ -36,6 +38,8 @@ const EditorSuggestions = ({
   cvData,
   englishVariant,
   onApplySuggestion,
+  collegeName,
+  programmeName,
 }: EditorSuggestionsProps) => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -105,16 +109,23 @@ const EditorSuggestions = ({
     personalization: suggestions.filter((s) => s.type === "personalization"),
   };
 
+  const feedbackMode = collegeId && programmeId 
+    ? `Personalized for ${collegeName}${programmeName ? ` - ${programmeName}` : ''}` 
+    : "Generic feedback mode";
+
   return (
     <div className="h-full flex flex-col bg-card border-l border-border">
       <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <FileEdit className="w-5 h-5 text-primary" />
           <h2 className="font-semibold text-lg">Editorial Feedback</h2>
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          {collegeId && programmeId ? '✓' : '⚠️'} {feedbackMode}
+        </p>
         <Button
           onClick={handleAnalyze}
-          disabled={analyzing || !content.trim()}
+          disabled={analyzing || !content.trim() || content.length < 50}
           className="w-full"
           variant="default"
         >
@@ -130,6 +141,9 @@ const EditorSuggestions = ({
             </>
           )}
         </Button>
+        {content.length < 50 && (
+          <p className="text-xs text-muted-foreground mt-2">Write at least 50 characters to get feedback</p>
+        )}
       </div>
 
       <ScrollArea className="flex-1">
@@ -137,7 +151,10 @@ const EditorSuggestions = ({
           {suggestions.length === 0 && !analyzing && (
             <div className="text-center py-8 text-muted-foreground">
               <FileEdit className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">Click the button above to get personalized editorial feedback based on successful essays.</p>
+              <p className="text-sm">
+                Click the button above to get {collegeId && programmeId ? 'personalized' : 'generic'} editorial feedback
+                {collegeId && programmeId ? ' based on successful essays' : ''}.
+              </p>
             </div>
           )}
 
