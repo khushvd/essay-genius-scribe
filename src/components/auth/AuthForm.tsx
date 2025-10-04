@@ -51,12 +51,48 @@ export const AuthForm = () => {
       }
 
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         
         if (error) throw error;
+
+        // Check account status after login
+        if (data.user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('account_status')
+            .eq('id', data.user.id)
+            .single();
+
+          if (profileError) {
+            console.error('Error fetching profile:', profileError);
+            toast.error('Unable to verify account status');
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+
+          // Handle different account statuses
+          if (profile.account_status === 'pending') {
+            toast.info('Your account is pending approval');
+            navigate("/pending-approval");
+            setLoading(false);
+            return;
+          } else if (profile.account_status === 'rejected') {
+            toast.error('Your account has been rejected. Please contact support.');
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          } else if (profile.account_status === 'suspended') {
+            toast.error('Your account has been suspended. Please contact support.');
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+        }
+        
         toast.success("Welcome back!");
         navigate("/dashboard");
       } else {

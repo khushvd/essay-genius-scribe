@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Download, CheckCircle, Sparkles, AlertCircle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,6 +13,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import EditorSuggestions from "@/components/editor/EditorSuggestions";
+import EditorHighlighter from "@/components/editor/EditorHighlighter";
 import { EssayScoreCard } from "@/components/editor/EssayScoreCard";
 
 const Editor = () => {
@@ -23,6 +24,8 @@ const Editor = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
   const hasMinContent = content.length >= 50;
@@ -71,10 +74,69 @@ const Editor = () => {
   };
 
   const handleApplySuggestion = (suggestion: any) => {
-    const before = content.substring(0, suggestion.location.start);
-    const after = content.substring(suggestion.location.end);
-    const newContent = before + suggestion.suggestion + after;
-    setContent(newContent);
+    try {
+      const { start, end } = suggestion.location;
+      
+      // Validate bounds
+      if (start < 0 || end > content.length || start >= end) {
+        toast.error('Invalid suggestion position');
+        return;
+      }
+
+      // Extract the original text to verify it matches
+      const currentText = content.substring(start, end);
+      
+      // Clean the suggestion text
+      let cleanSuggestion = suggestion.suggestion
+        .replace(/^["']|["']$/g, '') // Remove quotes
+        .trim();
+
+      // If exact match fails, try fuzzy matching
+      if (currentText !== suggestion.originalText) {
+        // Try to find the text in nearby positions (within 50 chars)
+        let found = false;
+        for (let offset = -50; offset <= 50; offset++) {
+          const testStart = start + offset;
+          const testEnd = end + offset;
+          if (testStart >= 0 && testEnd <= content.length) {
+            const testText = content.substring(testStart, testEnd);
+            if (testText === suggestion.originalText) {
+              // Found it! Use adjusted positions
+              const before = content.substring(0, testStart);
+              const after = content.substring(testEnd);
+              setContent(before + cleanSuggestion + after);
+              setAppliedSuggestions(prev => new Set(prev).add(suggestion.id));
+              found = true;
+              break;
+            }
+          }
+        }
+        
+        if (!found) {
+          console.warn('Could not find exact match for suggestion, applying anyway');
+          // Apply with original positions as fallback
+          const before = content.substring(0, start);
+          const after = content.substring(end);
+          setContent(before + cleanSuggestion + after);
+          setAppliedSuggestions(prev => new Set(prev).add(suggestion.id));
+        }
+      } else {
+        // Exact match - apply directly
+        const before = content.substring(0, start);
+        const after = content.substring(end);
+        setContent(before + cleanSuggestion + after);
+        setAppliedSuggestions(prev => new Set(prev).add(suggestion.id));
+      }
+      
+      toast.success('Suggestion applied');
+    } catch (error) {
+      console.error('Error applying suggestion:', error);
+      toast.error('Failed to apply suggestion');
+    }
+  };
+
+  const handleDismissSuggestion = (suggestionId: string) => {
+    setAppliedSuggestions(prev => new Set(prev).add(suggestionId));
   };
 
   const handleExportAsWord = async () => {
@@ -196,12 +258,24 @@ const Editor = () => {
         <div className="flex-1 overflow-auto">
           <div className="container mx-auto px-4 py-8 max-w-4xl">
             <div className="bg-card rounded-2xl shadow-soft border border-border p-4 md:p-8">
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="min-h-[400px] md:min-h-[600px] font-serif text-base sm:text-lg leading-relaxed resize-none border-0 focus-visible:ring-0 p-0"
-                placeholder="Write your essay here..."
-              />
+              <div className="relative">
+                <Textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="min-h-[400px] md:min-h-[600px] font-serif text-base sm:text-lg leading-relaxed resize-none border-0 focus-visible:ring-0 p-0 relative z-10"
+                  placeholder="Write your essay here..."
+                  style={{ backgroundColor: 'transparent' }}
+                />
+                <EditorHighlighter
+                  content={content}
+                  suggestions={[]}
+                  textareaRef={textareaRef}
+                  onApply={handleApplySuggestion}
+                  onDismiss={handleDismissSuggestion}
+                  appliedSuggestions={appliedSuggestions}
+                />
+              </div>
               
               <div className="flex items-center gap-4 text-sm text-muted-foreground mt-4 pt-4 border-t border-border">
                 <span>{content.length} characters</span>

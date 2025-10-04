@@ -17,6 +17,7 @@ export const UserManagement = () => {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -87,18 +88,55 @@ export const UserManagement = () => {
   }, [searchQuery, roleFilter, statusFilter, users]);
 
   const handleRoleChange = async (userId: string, newRole: 'free' | 'premium' | 'admin') => {
+    setUpdatingUserId(userId);
+    
+    // Optimistic update
+    const previousUsers = [...users];
+    setUsers(prevUsers =>
+      prevUsers.map(user =>
+        user.id === userId ? { ...user, role: newRole, user_roles: [{ role: newRole }] } : user
+      )
+    );
+
     try {
       const { error } = await supabase
         .from('user_roles')
         .update({ role: newRole })
         .eq('user_id', userId);
-      
-      if (error) throw error;
-      toast.success(`Role updated to ${newRole}`);
-      fetchUsers();
+
+      if (error) {
+        console.error('Error updating role:', error);
+        // Rollback on error
+        setUsers(previousUsers);
+        toast.error('Failed to update role: ' + error.message);
+        setUpdatingUserId(null);
+        return;
+      }
+
+      // Verify the update
+      const { data: updatedRole, error: verifyError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (verifyError || !updatedRole) {
+        console.error('Error verifying role update:', verifyError);
+        setUsers(previousUsers);
+        toast.error('Failed to verify role update');
+      } else if (updatedRole.role !== newRole) {
+        console.error('Role mismatch after update');
+        setUsers(previousUsers);
+        toast.error('Role update verification failed');
+      } else {
+        toast.success(`Role updated to ${newRole}`);
+      }
     } catch (error) {
-      console.error('Error updating role:', error);
-      toast.error("Failed to update role");
+      console.error('Error in handleRoleChange:', error);
+      setUsers(previousUsers);
+      toast.error('An error occurred while updating the role');
+    } finally {
+      setUpdatingUserId(null);
     }
   };
 
@@ -252,12 +290,13 @@ export const UserManagement = () => {
                       Suspend
                     </Button>
                   )}
-                  <div className="w-32">
+                  <div className="flex items-center gap-2">
                     <Select
                       value={currentRole}
                       onValueChange={(value: any) => handleRoleChange(user.id, value)}
+                      disabled={updatingUserId === user.id}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-32">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -266,6 +305,9 @@ export const UserManagement = () => {
                         <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
+                    {updatingUserId === user.id && (
+                      <span className="text-xs text-muted-foreground">Updating...</span>
+                    )}
                   </div>
                 </div>
               </div>

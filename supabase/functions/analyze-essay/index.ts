@@ -420,12 +420,22 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
       feedbackData = JSON.parse(toolCall.function.arguments);
     }
     
-    // Add unique IDs to suggestions and create analysis ID
+    // Clean suggestion text and add unique IDs
     const analysisId = `analysis-${Date.now()}`;
-    const suggestionsWithIds = feedbackData.suggestions.map((s: any, idx: number) => ({
-      id: `${Date.now()}-${idx}`,
-      ...s
-    }));
+    const suggestionsWithIds = feedbackData.suggestions.map((s: any, idx: number) => {
+      // Clean the suggestion text - remove quotes, "Replace with:", etc.
+      let cleanSuggestion = s.suggestion || '';
+      cleanSuggestion = cleanSuggestion
+        .replace(/^["']|["']$/g, '') // Remove leading/trailing quotes
+        .replace(/^(Replace with:|Change to:|Use instead:|Rewrite as:)\s*/i, '') // Remove common prefixes
+        .trim();
+
+      return {
+        id: `${Date.now()}-${idx}`,
+        ...s,
+        suggestion: cleanSuggestion
+      };
+    });
 
     // Generate essay score using second AI call
     const scorePrompt = `Based on the essay analysis, provide detailed quality scores.

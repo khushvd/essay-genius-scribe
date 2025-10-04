@@ -64,25 +64,39 @@ const PendingApproval = () => {
 
   return (
     <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md p-6">
         <CardHeader>
-          <div className="flex items-center gap-2 text-warning mb-2">
-            <AlertCircle className="w-5 h-5" />
-            <CardTitle>Account Pending Approval</CardTitle>
-          </div>
-          <CardDescription>
-            Your account is currently under review
-          </CardDescription>
+          <CardTitle className="text-2xl font-bold text-center">
+            Account Pending Approval
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Thank you for signing up! Your account ({email}) is currently pending approval by an administrator.
-            You will receive an email notification once your account has been reviewed.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            This usually takes 1-2 business days. If you have any questions, please contact support.
-          </p>
-          <Button onClick={handleSignOut} variant="outline" className="w-full">
+        <CardContent className="space-y-6">
+          <div className="text-center space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-full bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center">
+              <AlertCircle className="w-8 h-8 text-yellow-600 dark:text-yellow-500" />
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Logged in as: <span className="font-medium text-foreground">{email}</span>
+              </p>
+              
+              <p className="text-muted-foreground">
+                Your account is currently under review by our administrators.
+                You'll receive an email notification once your account has been approved.
+              </p>
+              
+              <p className="text-sm text-muted-foreground">
+                This typically takes 24-48 hours. Thank you for your patience!
+              </p>
+            </div>
+          </div>
+
+          <Button 
+            onClick={handleSignOut} 
+            variant="outline" 
+            className="w-full"
+          >
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>
