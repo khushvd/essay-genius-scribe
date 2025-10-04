@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Sparkles, Upload } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
@@ -18,6 +19,11 @@ export const PortfolioManager = () => {
   const [colleges, setColleges] = useState<any[]>([]);
   const [programmes, setProgrammes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [aiParsing, setAiParsing] = useState(false);
+  const [aiParsedData, setAiParsedData] = useState<any>(null);
+  const [essayFile, setEssayFile] = useState<File | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     college_id: "",
@@ -68,7 +74,7 @@ export const PortfolioManager = () => {
     }
   };
 
-  const handleFileUpload = async (file: File, field: 'essay_content' | 'writer_resume') => {
+  const handleFileUpload = async (file: File): Promise<string> => {
     try {
       let text = "";
       
@@ -84,8 +90,63 @@ export const PortfolioManager = () => {
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
         text = result.value;
+      } else if (file.type === "text/plain") {
+        text = await file.text();
       }
 
+      return text;
+    } catch (error) {
+      console.error('Error reading file:', error);
+      throw error;
+    }
+  };
+
+  const handleAiParse = async () => {
+    if (!essayFile) {
+      toast.error("Please upload an essay file");
+      return;
+    }
+
+    setAiParsing(true);
+    try {
+      const essayContent = await handleFileUpload(essayFile);
+      const resumeContent = resumeFile ? await handleFileUpload(resumeFile) : null;
+      const questionnaireContent = questionnaireFile ? await handleFileUpload(questionnaireFile) : null;
+
+      const { data, error } = await supabase.functions.invoke('parse-portfolio-essay', {
+        body: { essayContent, resumeContent, questionnaireContent }
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      setAiParsedData(data);
+      
+      // Pre-fill form with AI parsed data
+      setFormData({
+        college_id: '',
+        programme_id: '',
+        essay_title: data.essay_title || '',
+        essay_content: data.essay_content || '',
+        writer_resume: data.writer_resume || '',
+        writer_questionnaire: JSON.stringify(data.writer_questionnaire || {}, null, 2),
+        performance_score: data.suggested_score || 85,
+        key_strategies: data.key_strategies?.join('\n') || '',
+        degree_level: data.degree_level || 'bachelors'
+      });
+
+      toast.success("AI parsing complete! Review and edit the data below.");
+    } catch (error: any) {
+      console.error('Error parsing with AI:', error);
+      toast.error(error.message || "Failed to parse with AI");
+    } finally {
+      setAiParsing(false);
+    }
+  };
+
+  const handleManualFileUpload = async (file: File, field: 'essay_content' | 'writer_resume') => {
+    try {
+      const text = await handleFileUpload(file);
       setFormData(prev => ({ ...prev, [field]: text }));
       toast.success(`${field === 'essay_content' ? 'Essay' : 'Resume'} uploaded successfully`);
     } catch (error) {
@@ -99,15 +160,31 @@ export const PortfolioManager = () => {
     setLoading(true);
 
     try {
+      const strategiesArray = formData.key_strategies
+        .split('\n')
+        .filter(s => s.trim())
+        .map(s => s.trim());
+
+      let questionnaireData = null;
+      if (formData.writer_questionnaire) {
+        try {
+          questionnaireData = JSON.parse(formData.writer_questionnaire);
+        } catch {
+          toast.error("Invalid questionnaire JSON format");
+          setLoading(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.from('successful_essays').insert({
-        college_id: formData.college_id,
-        programme_id: formData.programme_id,
+        college_id: formData.college_id || null,
+        programme_id: formData.programme_id || null,
         essay_title: formData.essay_title,
         essay_content: formData.essay_content,
         writer_resume: formData.writer_resume || null,
-        writer_questionnaire: formData.writer_questionnaire ? JSON.parse(formData.writer_questionnaire) : null,
+        writer_questionnaire: questionnaireData,
         performance_score: formData.performance_score,
-        key_strategies: formData.key_strategies ? JSON.parse(formData.key_strategies) : null,
+        key_strategies: strategiesArray,
         degree_level: formData.degree_level
       });
 
@@ -125,6 +202,10 @@ export const PortfolioManager = () => {
         key_strategies: "",
         degree_level: "bachelors"
       });
+      setAiParsedData(null);
+      setEssayFile(null);
+      setResumeFile(null);
+      setQuestionnaireFile(null);
       fetchData();
     } catch (error) {
       console.error('Error adding essay:', error);
@@ -154,15 +235,90 @@ export const PortfolioManager = () => {
       <h2 className="text-2xl font-bold font-serif">Portfolio Management</h2>
 
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Add Winning Essay</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Add Winning Essay</h3>
+          {aiParsedData && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              AI Parsed
+            </Badge>
+          )}
+        </div>
+
+        {/* AI-Powered Upload Section */}
+        <div className="bg-gradient-subtle rounded-lg p-6 mb-6 border border-border">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h4 className="font-semibold">AI Auto-Parse (Recommended)</h4>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Upload documents and let AI automatically extract all the data
+          </p>
+
+          <div className="grid gap-4 md:grid-cols-3 mb-4">
+            <div className="space-y-2">
+              <Label htmlFor="essay-file">Essay Document *</Label>
+              <Input
+                id="essay-file"
+                type="file"
+                accept=".pdf,.docx"
+                onChange={(e) => setEssayFile(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="resume-file">Resume/CV (Optional)</Label>
+              <Input
+                id="resume-file"
+                type="file"
+                accept=".pdf,.docx"
+                onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="questionnaire-file">Questionnaire (Optional)</Label>
+              <Input
+                id="questionnaire-file"
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={(e) => setQuestionnaireFile(e.target.files?.[0] || null)}
+              />
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            onClick={handleAiParse}
+            disabled={!essayFile || aiParsing}
+            className="w-full"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {aiParsing ? "AI Parsing..." : "Parse with AI"}
+          </Button>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label>College</Label>
+          <div className="space-y-2">
+            <Label htmlFor="essay-title">Essay Title *</Label>
+            <Input
+              id="essay-title"
+              value={formData.essay_title}
+              onChange={(e) => setFormData(prev => ({ ...prev, essay_title: e.target.value }))}
+              required
+            />
+            {aiParsedData && (
+              <p className="text-xs text-muted-foreground">
+                AI Suggested: {aiParsedData.college_name} - {aiParsedData.programme_name}
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="college">College (Optional)</Label>
               <Select
                 value={formData.college_id}
                 onValueChange={(value) => {
-                  setFormData({ ...formData, college_id: value });
+                  setFormData(prev => ({ ...prev, college_id: value }));
                   fetchProgrammes(value);
                 }}
               >
@@ -179,11 +335,11 @@ export const PortfolioManager = () => {
               </Select>
             </div>
 
-            <div>
-              <Label>Programme</Label>
+            <div className="space-y-2">
+              <Label htmlFor="programme">Programme (Optional)</Label>
               <Select
                 value={formData.programme_id}
-                onValueChange={(value) => setFormData({ ...formData, programme_id: value })}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, programme_id: value }))}
                 disabled={!formData.college_id}
               >
                 <SelectTrigger>
@@ -198,23 +354,12 @@ export const PortfolioManager = () => {
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label>Essay Title</Label>
-              <Input
-                value={formData.essay_title}
-                onChange={(e) => setFormData({ ...formData, essay_title: e.target.value })}
-                placeholder="e.g., My Journey to Computer Science"
-              />
-            </div>
-
-            <div>
-              <Label>Degree Level</Label>
+            <div className="space-y-2">
+              <Label htmlFor="degree-level">Degree Level</Label>
               <Select
                 value={formData.degree_level}
-                onValueChange={(value) => setFormData({ ...formData, degree_level: value })}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, degree_level: value }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -232,7 +377,7 @@ export const PortfolioManager = () => {
             <Input
               type="file"
               accept=".pdf,.docx"
-              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'essay_content')}
+              onChange={(e) => e.target.files?.[0] && handleManualFileUpload(e.target.files[0], 'essay_content')}
               className="mb-2"
             />
             <Textarea
@@ -249,7 +394,7 @@ export const PortfolioManager = () => {
             <Input
               type="file"
               accept=".pdf,.docx"
-              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'writer_resume')}
+              onChange={(e) => e.target.files?.[0] && handleManualFileUpload(e.target.files[0], 'writer_resume')}
               className="mb-2"
             />
             <Textarea
@@ -284,19 +429,19 @@ export const PortfolioManager = () => {
             </div>
 
             <div>
-              <Label>Key Strategies (JSON format)</Label>
+              <Label>Key Strategies (one per line)</Label>
               <Textarea
                 value={formData.key_strategies}
                 onChange={(e) => setFormData({ ...formData, key_strategies: e.target.value })}
-                rows={2}
-                placeholder='["Strategy 1", "Strategy 2"]'
+                rows={3}
+                placeholder="Strategy 1&#10;Strategy 2&#10;Strategy 3"
               />
             </div>
           </div>
 
-          <Button type="submit" disabled={loading}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Essay
+          <Button type="submit" disabled={loading || !formData.essay_content || !formData.essay_title}>
+            <Upload className="w-4 h-4 mr-2" />
+            {loading ? "Adding..." : (aiParsedData ? "Add Parsed Essay to Portfolio" : "Add to Portfolio")}
           </Button>
         </form>
       </Card>
@@ -313,11 +458,11 @@ export const PortfolioManager = () => {
                 </p>
               </div>
               <Button
-                variant="ghost"
+                variant="destructive"
                 size="sm"
                 onClick={() => handleDelete(essay.id)}
               >
-                <Trash2 className="w-4 h-4 text-destructive" />
+                <Trash2 className="w-4 h-4" />
               </Button>
             </div>
           ))}

@@ -12,6 +12,7 @@ interface EssayListProps {
 
 export const EssayList = ({ userId }: EssayListProps) => {
   const [essays, setEssays] = useState<any[]>([]);
+  const [essayScores, setEssayScores] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -29,6 +30,26 @@ export const EssayList = ({ userId }: EssayListProps) => {
 
       if (!error && data) {
         setEssays(data);
+        
+        // Fetch latest scores for all essays
+        const essayIds = data.map(e => e.id);
+        if (essayIds.length > 0) {
+          const { data: scoresData } = await supabase
+            .from('essay_scores')
+            .select('essay_id, overall_score, scored_at')
+            .in('essay_id', essayIds)
+            .order('scored_at', { ascending: false });
+
+          if (scoresData) {
+            const latestScores: Record<string, number> = {};
+            scoresData.forEach(score => {
+              if (!latestScores[score.essay_id]) {
+                latestScores[score.essay_id] = score.overall_score || 0;
+              }
+            });
+            setEssayScores(latestScores);
+          }
+        }
       }
       setLoading(false);
     };
@@ -97,9 +118,22 @@ export const EssayList = ({ userId }: EssayListProps) => {
           <CardHeader>
             <div className="flex items-start justify-between gap-2">
               <CardTitle className="text-lg line-clamp-1">{essay.title}</CardTitle>
-              <Badge variant={essay.status === "completed" ? "default" : "secondary"}>
-                {essay.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {essayScores[essay.id] && (
+                  <Badge 
+                    variant={
+                      essayScores[essay.id] >= 80 ? "default" : 
+                      essayScores[essay.id] >= 60 ? "secondary" : 
+                      "outline"
+                    }
+                  >
+                    Score: {essayScores[essay.id]}
+                  </Badge>
+                )}
+                <Badge variant={essay.status === "completed" ? "default" : "secondary"}>
+                  {essay.status}
+                </Badge>
+              </div>
             </div>
             <CardDescription className="line-clamp-1">
               {essay.colleges?.name} • {essay.programmes?.name}

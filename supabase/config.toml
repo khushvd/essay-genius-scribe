@@ -8,3 +8,9 @@ verify_jwt = true
 
 [functions.export-analytics]
 verify_jwt = true
+
+[functions.parse-portfolio-essay]
+verify_jwt = true
+
+[functions.create-user]
+verify_jwt = true

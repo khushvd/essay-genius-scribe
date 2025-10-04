@@ -13,6 +13,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import EditorSuggestions from "@/components/editor/EditorSuggestions";
+import { EssayScoreCard } from "@/components/editor/EssayScoreCard";
 
 const Editor = () => {
   const { id } = useParams();
@@ -165,18 +166,21 @@ const Editor = () => {
         </div>
         
         {/* Desktop: Side Panel */}
-        <div className="w-[400px] hidden lg:block">
-          <EditorSuggestions
-            essayId={id!}
-            content={content}
-            collegeId={essay.college_id}
-            programmeId={essay.programme_id}
-            cvData={essay.cv_data}
-            englishVariant={essay.programmes?.english_variant || "american"}
-            onApplySuggestion={handleApplySuggestion}
-            collegeName={essay.colleges?.name}
-            programmeName={essay.programmes?.name}
-          />
+        <div className="w-[400px] hidden lg:block overflow-auto">
+          <div className="p-4 space-y-4 sticky top-0">
+            <EssayScoreCard essayId={id!} />
+            <EditorSuggestions
+              essayId={id!}
+              content={content}
+              collegeId={essay.college_id}
+              programmeId={essay.programme_id}
+              cvData={essay.cv_data}
+              englishVariant={essay.programmes?.english_variant || "american"}
+              onApplySuggestion={handleApplySuggestion}
+              collegeName={essay.colleges?.name}
+              programmeName={essay.programmes?.name}
+            />
+          </div>
         </div>
 
         {/* Mobile: Floating Button + Drawer */}
@@ -190,18 +194,21 @@ const Editor = () => {
               View Feedback
             </Button>
           </DrawerTrigger>
-          <DrawerContent className="h-[85vh]">
-            <EditorSuggestions
-              essayId={id!}
-              content={content}
-              collegeId={essay.college_id}
-              programmeId={essay.programme_id}
-              cvData={essay.cv_data}
-              englishVariant={essay.programmes?.english_variant || "american"}
-              onApplySuggestion={handleApplySuggestion}
-              collegeName={essay.colleges?.name}
-              programmeName={essay.programmes?.name}
-            />
+          <DrawerContent className="h-[85vh] overflow-auto">
+            <div className="p-4 space-y-4">
+              <EssayScoreCard essayId={id!} />
+              <EditorSuggestions
+                essayId={id!}
+                content={content}
+                collegeId={essay.college_id}
+                programmeId={essay.programme_id}
+                cvData={essay.cv_data}
+                englishVariant={essay.programmes?.english_variant || "american"}
+                onApplySuggestion={handleApplySuggestion}
+                collegeName={essay.colleges?.name}
+                programmeName={essay.programmes?.name}
+              />
+            </div>
           </DrawerContent>
         </Drawer>
       </main>
