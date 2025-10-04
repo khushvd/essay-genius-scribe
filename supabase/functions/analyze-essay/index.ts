@@ -71,7 +71,7 @@ serve(async (req) => {
   }
 
   try {
-    const { essayId, content, collegeId, programmeId, cvData, englishVariant } = await req.json();
+    const { essayId, content, cvData } = await req.json();
 
     if (!content) {
       return new Response(
@@ -85,21 +85,47 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch college tier for AI model selection
-    let collegeTier = 'standard';
-    if (collegeId) {
-      const { data: collegeData, error: collegeError } = await supabase
-        .from('colleges')
-        .select('tier')
-        .eq('id', collegeId)
-        .single();
-      
-      if (collegeError) {
-        console.error('Error fetching college tier:', collegeError);
-      } else {
-        collegeTier = collegeData?.tier || 'standard';
-      }
+    // Fetch essay details including all metadata
+    const { data: essayData, error: essayError } = await supabase
+      .from('essays')
+      .select(`
+        *,
+        colleges (
+          id,
+          name,
+          tier,
+          country
+        ),
+        programmes (
+          id,
+          name,
+          english_variant
+        )
+      `)
+      .eq('id', essayId)
+      .single();
+
+    if (essayError) {
+      console.error('Error fetching essay:', essayError);
     }
+
+    // Extract metadata
+    const collegeId = essayData?.colleges?.id || null;
+    const programmeId = essayData?.programmes?.id || null;
+    const collegeTier = essayData?.colleges?.tier || 'standard';
+    const englishVariant = essayData?.programmes?.english_variant || 'american';
+    const degreeLevel = essayData?.degree_level || 'bachelors';
+    const questionnaireData = essayData?.questionnaire_data;
+    const customCollegeName = essayData?.custom_college_name;
+    const customProgrammeName = essayData?.custom_programme_name;
+    
+    console.log('Essay analysis context:', { 
+      collegeTier, 
+      englishVariant, 
+      degreeLevel,
+      hasQuestionnaire: !!questionnaireData,
+      isCustomCollege: !!customCollegeName
+    });
 
     // Fetch successful essays only if college and programme are provided
     let ragContext = 'No specific college/programme context provided. Providing general editorial guidance based on best practices for college essays.';
@@ -131,8 +157,24 @@ ${JSON.stringify(essay.key_strategies, null, 2)}
       }
     }
 
-    // Build specialized prompt
+    // Build specialized prompt with degree-level specific guidance
+    const degreeGuidance = degreeLevel === 'masters' 
+      ? `This is a Master's programme essay. Focus on:
+- Professional goals and career trajectory
+- Academic and research interests
+- How the programme aligns with their career objectives
+- Mature, goal-oriented narrative style
+- Specific examples of relevant experience and expertise`
+      : `This is a Bachelor's programme essay. Focus on:
+- Personal growth and self-discovery
+- Creative storytelling and authentic voice
+- Character development and values
+- Emotional resonance and relatability
+- How experiences shaped their perspective`;
+
     const systemPrompt = `You are an expert editor for Sandwich, a college essay editing platform. Your role is to provide editorial feedback based on patterns from successful essays.
+
+${degreeGuidance}
 
 Style Guidelines:
 - ${englishVariant === 'british' ? 'British' : 'American'} English spelling and grammar
@@ -150,11 +192,34 @@ Your task: Analyze the essay and provide specific, actionable feedback organized
 
 Base your feedback on patterns from successful essays provided in the context.`;
 
+    const collegeContext = customCollegeName 
+      ? `Target Institution: ${customCollegeName}${customProgrammeName ? ` - ${customProgrammeName}` : ''} (custom entry)`
+      : `Target Institution: ${essayData?.colleges?.name || 'General'} - ${essayData?.programmes?.name || 'General'}`;
+
+    const questionnaireContext = questionnaireData 
+      ? `\nSTUDENT BACKGROUND QUESTIONNAIRE:
+${questionnaireData.academicInterests ? `Academic Interests: ${questionnaireData.academicInterests}` : ''}
+${questionnaireData.extracurriculars ? `Extracurricular Activities: ${questionnaireData.extracurriculars}` : ''}
+${questionnaireData.careerGoals ? `Career Goals: ${questionnaireData.careerGoals}` : ''}
+${questionnaireData.challenges ? `Personal Challenges/Growth: ${questionnaireData.challenges}` : ''}
+
+Use this background to identify opportunities to:
+- Connect essay themes to their stated interests and goals
+- Suggest incorporating relevant experiences they've mentioned
+- Ensure consistency between their background and essay narrative
+- Personalize suggestions based on their unique story
+`
+      : '';
+
     const userPrompt = `
+${collegeContext}
+
 SUCCESSFUL ESSAYS CONTEXT:
 ${ragContext}
 
-${cvData ? `\nWRITER'S CV DATA:\n${JSON.stringify(cvData, null, 2)}\n` : ''}
+${cvData ? `\nWRITER'S CV/RESUME:\n${typeof cvData === 'string' ? cvData : JSON.stringify(cvData, null, 2)}\n` : ''}
+
+${questionnaireContext}
 
 ESSAY TO ANALYZE:
 ${content}
@@ -164,7 +229,8 @@ Please analyze this essay and provide editorial feedback with a humanised, conve
 - What the issue is
 - A specific suggested rewrite (ensure it sounds natural and human, not robotic)
 - Why this matters (based on successful essay patterns)
-- Evidence from the successful essays that supports this recommendation`;
+- Evidence from the successful essays that supports this recommendation
+${questionnaireData ? '\n- How this connects to the student\'s background and goals (when relevant)' : ''}`;
 
     // Define tools schema for both APIs
     const tools = [

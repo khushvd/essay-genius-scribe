@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import mammoth from "mammoth";
+import * as pdfjsLib from "pdfjs-dist";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,9 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { ChevronDown, Upload, FileText, X } from "lucide-react";
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface NewEssayDialogProps {
   open: boolean;
@@ -112,12 +116,32 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
 
   const handleResumeUpload = async (file: File) => {
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      setCvText(result.value);
+      const fileType = file.type;
+      let extractedText = "";
+
+      if (fileType === "application/pdf") {
+        // Handle PDF
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(" ");
+          extractedText += pageText + "\n";
+        }
+      } else {
+        // Handle DOCX
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        extractedText = result.value;
+      }
+
+      setCvText(extractedText);
       setResumeFile(file);
       toast.success("Resume uploaded successfully!");
     } catch (error) {
+      console.error("Resume parsing error:", error);
       toast.error("Failed to parse resume. Please try pasting the text instead.");
     }
   };
