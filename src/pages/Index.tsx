@@ -16,8 +16,8 @@ const Index = () => {
             Sandwich Essay Platform
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Professional essay editing powered by AI. Hyperpersonalized recommendations 
-            based on successful applications to your target colleges.
+            Professional essay editing with hyperpersonalized recommendations 
+            based on Sandwich's winning formula and successful applications to your target colleges.
           </p>
           <div className="flex gap-4 justify-center">
             <Button size="lg" onClick={() => navigate("/auth")} className="shadow-soft">
@@ -44,9 +44,9 @@ const Index = () => {
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
               <Sparkles className="w-6 h-6 text-primary" />
             </div>
-            <h3 className="text-xl font-bold font-serif mb-2">AI-Powered Analysis</h3>
+            <h3 className="text-xl font-bold font-serif mb-2">Expert-Backed Analysis</h3>
             <p className="text-muted-foreground">
-              Claude AI trained on top-performing essays provides intelligent, contextual suggestions.
+              Our methodology trained on top-performing essays provides intelligent, contextual suggestions based on Sandwich's winning formula.
             </p>
           </div>
 

@@ -2,3 +2,9 @@ project_id = "fsrelhcbfrpfprmzkjmo"
 
 [functions.analyze-essay]
 verify_jwt = true
+
+[functions.track-essay-analytics]
+verify_jwt = true
+
+[functions.export-analytics]
+verify_jwt = true

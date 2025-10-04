@@ -166,7 +166,7 @@ serve(async (req) => {
     if (collegeId && programmeId) {
       const { data: successfulEssays, error: essaysError } = await supabase
         .from('successful_essays')
-        .select('essay_content, key_strategies, performance_score')
+        .select('essay_content, key_strategies, performance_score, writer_resume, writer_questionnaire, essay_title, degree_level')
         .eq('college_id', collegeId)
         .eq('programme_id', programmeId)
         .order('performance_score', { ascending: false })
@@ -179,9 +179,11 @@ serve(async (req) => {
       // Construct RAG context if we have successful essays
       if (successfulEssays && successfulEssays.length > 0) {
         ragContext = successfulEssays.map((essay, idx) => `
-Example Essay ${idx + 1} (Score: ${essay.performance_score}/100):
+Example Essay ${idx + 1} (Score: ${essay.performance_score}/100)${essay.essay_title ? ` - "${essay.essay_title}"` : ''}${essay.degree_level ? ` [${essay.degree_level}]` : ''}:
 ${essay.essay_content.substring(0, 500)}...
 
+${essay.writer_resume ? `Writer's Background:\n${essay.writer_resume.substring(0, 300)}...\n` : ''}
+${essay.writer_questionnaire ? `Writer's Profile:\n${JSON.stringify(essay.writer_questionnaire, null, 2)}\n` : ''}
 Key Strategies Used:
 ${JSON.stringify(essay.key_strategies, null, 2)}
 `).join('\n\n---\n\n');
@@ -308,6 +310,44 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
             additionalProperties: false
           }
         }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'score_essay',
+          description: 'Calculate quality scores for the essay across multiple dimensions',
+          parameters: {
+            type: 'object',
+            properties: {
+              overall_score: { 
+                type: 'number',
+                description: 'Overall essay quality score (0-100)'
+              },
+              clarity_score: { 
+                type: 'number',
+                description: 'How clear and understandable the essay is (0-100)'
+              },
+              impact_score: { 
+                type: 'number',
+                description: 'How impactful and memorable the essay is (0-100)'
+              },
+              authenticity_score: { 
+                type: 'number',
+                description: 'How authentic and personal the voice is (0-100)'
+              },
+              coherence_score: { 
+                type: 'number',
+                description: 'How well-structured and coherent the essay is (0-100)'
+              },
+              reasoning: { 
+                type: 'string',
+                description: 'Detailed explanation of the scores'
+              }
+            },
+            required: ['overall_score', 'clarity_score', 'impact_score', 'authenticity_score', 'coherence_score', 'reasoning'],
+            additionalProperties: false
+          }
+        }
       }
     ];
 
@@ -380,15 +420,78 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
       feedbackData = JSON.parse(toolCall.function.arguments);
     }
     
-    // Add unique IDs to suggestions
+    // Add unique IDs to suggestions and create analysis ID
+    const analysisId = `analysis-${Date.now()}`;
     const suggestionsWithIds = feedbackData.suggestions.map((s: any, idx: number) => ({
       id: `${Date.now()}-${idx}`,
       ...s
     }));
 
+    // Generate essay score using second AI call
+    const scorePrompt = `Based on the essay analysis, provide detailed quality scores.
+
+Essay: ${content}
+
+Feedback provided: ${JSON.stringify(feedbackData.suggestions, null, 2)}
+
+Rate the essay on:
+1. Overall quality (0-100)
+2. Clarity of communication (0-100)
+3. Impact and memorability (0-100)
+4. Authenticity of voice (0-100)
+5. Coherence and structure (0-100)
+
+Provide detailed reasoning for each score.`;
+
+    try {
+      const scoreResponse = useClaude && !usingFallback
+        ? await callClaudeAPI(systemPrompt, scorePrompt, tools)
+        : await callGeminiAPI(systemPrompt, scorePrompt, tools);
+
+      if (scoreResponse.ok) {
+        const scoreData = await scoreResponse.json();
+        let essayScores;
+
+        if (useClaude && !usingFallback) {
+          const scoreToolUse = scoreData.content?.find((c: any) => c.type === 'tool_use' && c.name === 'score_essay');
+          essayScores = scoreToolUse?.input;
+        } else {
+          const scoreToolCall = scoreData.choices?.[0]?.message?.tool_calls?.find((tc: any) => tc.function.name === 'score_essay');
+          if (scoreToolCall) {
+            essayScores = JSON.parse(scoreToolCall.function.arguments);
+          }
+        }
+
+        // Store scores in database
+        if (essayScores) {
+          const { error: scoreError } = await supabase
+            .from('essay_scores')
+            .insert({
+              essay_id: essayId,
+              score_type: 'initial',
+              overall_score: Math.round(essayScores.overall_score),
+              clarity_score: Math.round(essayScores.clarity_score),
+              impact_score: Math.round(essayScores.impact_score),
+              authenticity_score: Math.round(essayScores.authenticity_score),
+              coherence_score: Math.round(essayScores.coherence_score),
+              ai_reasoning: essayScores.reasoning,
+              scored_by: user.id
+            });
+
+          if (scoreError) {
+            console.error('Error storing essay scores:', scoreError);
+          }
+        }
+      }
+    } catch (scoreError) {
+      console.error('Error generating essay scores:', scoreError);
+      // Don't fail the entire request if scoring fails
+    }
+
     return new Response(
       JSON.stringify({ 
         suggestions: suggestionsWithIds,
+        analysisId,
         metadata: {
           model: modelUsed,
           collegeTier

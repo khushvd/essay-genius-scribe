@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { LogOut, Plus, FileText } from "lucide-react";
 import { EssayList } from "@/components/dashboard/EssayList";
 import { NewEssayDialog } from "@/components/dashboard/NewEssayDialog";
+import { useUserRole } from "@/hooks/useUserRole";
+import AdminDashboard from "./AdminDashboard";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showNewEssay, setShowNewEssay] = useState(false);
+  const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -51,7 +54,7 @@ const Dashboard = () => {
     toast.success("Signed out successfully");
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
@@ -60,6 +63,11 @@ const Dashboard = () => {
         </div>
       </div>
     );
+  }
+
+  // Redirect admins to admin dashboard
+  if (isAdmin) {
+    return <AdminDashboard user={user} profile={profile} />;
   }
 
   return (

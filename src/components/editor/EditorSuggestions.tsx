@@ -46,6 +46,7 @@ const EditorSuggestions = ({
   const [analyzing, setAnalyzing] = useState(false);
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [analysisId, setAnalysisId] = useState<string>("");
 
   // Auto-analyze on mount if content exists
   useEffect(() => {
@@ -90,6 +91,7 @@ const EditorSuggestions = ({
 
       if (data?.suggestions) {
         setSuggestions(data.suggestions);
+        setAnalysisId(data.analysisId || `analysis-${Date.now()}`);
         toast.success(`Found ${data.suggestions.length} editorial suggestions`);
       } else {
         toast.success("Your essay looks great! No critical feedback at this time.");
@@ -103,14 +105,41 @@ const EditorSuggestions = ({
     }
   };
 
-  const handleApply = (suggestion: Suggestion) => {
+  const handleApply = async (suggestion: Suggestion) => {
     onApplySuggestion(suggestion);
     setAppliedSuggestions((prev) => new Set([...prev, suggestion.id]));
     toast.success("Suggestion applied");
+
+    // Track analytics
+    await trackSuggestionAction(suggestion, 'applied');
   };
 
-  const handleDismiss = (suggestionId: string) => {
+  const handleDismiss = async (suggestionId: string) => {
+    const suggestion = suggestions.find(s => s.id === suggestionId);
+    if (suggestion) {
+      await trackSuggestionAction(suggestion, 'dismissed');
+    }
     setSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
+  };
+
+  const trackSuggestionAction = async (suggestion: Suggestion, action: 'applied' | 'dismissed' | 'ignored') => {
+    try {
+      await supabase.functions.invoke('track-essay-analytics', {
+        body: {
+          essayId,
+          analysisId,
+          suggestionId: suggestion.id,
+          suggestionType: suggestion.type,
+          action,
+          originalText: suggestion.originalText,
+          suggestedText: suggestion.suggestion,
+          reasoning: suggestion.reasoning
+        }
+      });
+    } catch (error) {
+      console.error('Error tracking analytics:', error);
+      // Don't show error to user, this is background tracking
+    }
   };
 
   const groupedSuggestions = {

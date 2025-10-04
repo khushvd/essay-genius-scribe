@@ -38,6 +38,112 @@ export type Database = {
         }
         Relationships: []
       }
+      essay_analytics: {
+        Row: {
+          action: string
+          action_timestamp: string
+          analysis_id: string
+          created_at: string | null
+          essay_id: string
+          id: string
+          original_text: string | null
+          reasoning: string | null
+          suggested_text: string | null
+          suggestion_id: string
+          suggestion_type: string
+        }
+        Insert: {
+          action: string
+          action_timestamp?: string
+          analysis_id: string
+          created_at?: string | null
+          essay_id: string
+          id?: string
+          original_text?: string | null
+          reasoning?: string | null
+          suggested_text?: string | null
+          suggestion_id: string
+          suggestion_type: string
+        }
+        Update: {
+          action?: string
+          action_timestamp?: string
+          analysis_id?: string
+          created_at?: string | null
+          essay_id?: string
+          id?: string
+          original_text?: string | null
+          reasoning?: string | null
+          suggested_text?: string | null
+          suggestion_id?: string
+          suggestion_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "essay_analytics_essay_id_fkey"
+            columns: ["essay_id"]
+            isOneToOne: false
+            referencedRelation: "essays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      essay_scores: {
+        Row: {
+          ai_reasoning: string | null
+          authenticity_score: number | null
+          clarity_score: number | null
+          coherence_score: number | null
+          created_at: string | null
+          essay_id: string
+          id: string
+          impact_score: number | null
+          notes: string | null
+          overall_score: number | null
+          score_type: string
+          scored_at: string
+          scored_by: string | null
+        }
+        Insert: {
+          ai_reasoning?: string | null
+          authenticity_score?: number | null
+          clarity_score?: number | null
+          coherence_score?: number | null
+          created_at?: string | null
+          essay_id: string
+          id?: string
+          impact_score?: number | null
+          notes?: string | null
+          overall_score?: number | null
+          score_type: string
+          scored_at?: string
+          scored_by?: string | null
+        }
+        Update: {
+          ai_reasoning?: string | null
+          authenticity_score?: number | null
+          clarity_score?: number | null
+          coherence_score?: number | null
+          created_at?: string | null
+          essay_id?: string
+          id?: string
+          impact_score?: number | null
+          notes?: string | null
+          overall_score?: number | null
+          score_type?: string
+          scored_at?: string
+          scored_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "essay_scores_essay_id_fkey"
+            columns: ["essay_id"]
+            isOneToOne: false
+            referencedRelation: "essays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       essays: {
         Row: {
           college_id: string | null
@@ -168,29 +274,41 @@ export type Database = {
         Row: {
           college_id: string | null
           created_at: string | null
+          degree_level: string | null
           essay_content: string
+          essay_title: string | null
           id: string
           key_strategies: Json | null
           performance_score: number | null
           programme_id: string | null
+          writer_questionnaire: Json | null
+          writer_resume: string | null
         }
         Insert: {
           college_id?: string | null
           created_at?: string | null
+          degree_level?: string | null
           essay_content: string
+          essay_title?: string | null
           id?: string
           key_strategies?: Json | null
           performance_score?: number | null
           programme_id?: string | null
+          writer_questionnaire?: Json | null
+          writer_resume?: string | null
         }
         Update: {
           college_id?: string | null
           created_at?: string | null
+          degree_level?: string | null
           essay_content?: string
+          essay_title?: string | null
           id?: string
           key_strategies?: Json | null
           performance_score?: number | null
           programme_id?: string | null
+          writer_questionnaire?: Json | null
+          writer_resume?: string | null
         }
         Relationships: [
           {
@@ -235,6 +353,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_id_by_email: {
+        Args: { _email: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
