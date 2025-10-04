@@ -4,8 +4,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, CheckCircle, XCircle, Ban } from "lucide-react";
 import { AddUserDialog } from "./AddUserDialog";
 
 export const UserManagement = () => {
@@ -14,6 +15,7 @@ export const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -46,7 +48,6 @@ export const UserManagement = () => {
   useEffect(() => {
     let filtered = users;
 
-    // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(user =>
         user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -54,7 +55,6 @@ export const UserManagement = () => {
       );
     }
 
-    // Apply role filter
     if (roleFilter !== "all") {
       filtered = filtered.filter(user => {
         const userRole = user.user_roles?.[0]?.role || 'free';
@@ -62,32 +62,72 @@ export const UserManagement = () => {
       });
     }
 
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(user => user.account_status === statusFilter);
+    }
+
     setFilteredUsers(filtered);
-  }, [searchQuery, roleFilter, users]);
+  }, [searchQuery, roleFilter, statusFilter, users]);
 
   const handleRoleChange = async (userId: string, newRole: 'free' | 'premium' | 'admin') => {
     try {
-      // First, delete existing role
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      // Then insert new role
-      const { error } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          role: newRole
-        });
-
+      await supabase.from('user_roles').delete().eq('user_id', userId);
+      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: newRole });
       if (error) throw error;
-
       toast.success(`Role updated to ${newRole}`);
       fetchUsers();
     } catch (error) {
       console.error('Error updating role:', error);
       toast.error("Failed to update role");
+    }
+  };
+
+  const handleStatusChange = async (userId: string, newStatus: 'approved' | 'rejected' | 'suspended', userEmail: string, userName: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          account_status: newStatus,
+          approved_by: user?.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Send email notification
+      const emailType = newStatus === 'approved' ? 'approval' : newStatus === 'rejected' ? 'rejection' : 'suspension';
+      await supabase.functions.invoke('send-user-emails', {
+        body: {
+          type: emailType,
+          recipientEmail: userEmail,
+          recipientName: userName,
+          adminName: user?.email || 'Administrator',
+        }
+      });
+
+      toast.success(`User ${newStatus}`);
+      fetchUsers();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error("Failed to update status");
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="bg-warning/10 text-warning">Pending</Badge>;
+      case 'approved':
+        return <Badge className="bg-success/10 text-success">Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive">Rejected</Badge>;
+      case 'suspended':
+        return <Badge variant="destructive" className="bg-destructive/10">Suspended</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -127,6 +167,18 @@ export const UserManagement = () => {
               <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="suspended">Suspended</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-4">
           {filteredUsers.map((user) => {
@@ -135,13 +187,51 @@ export const UserManagement = () => {
             return (
               <div key={user.id} className="flex items-center justify-between p-4 border rounded">
                 <div className="flex-1">
-                  <p className="font-medium">{user.full_name}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium">{user.full_name}</p>
+                    {getStatusBadge(user.account_status)}
+                  </div>
                   <p className="text-sm text-muted-foreground">{user.email}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Joined: {new Date(user.created_at).toLocaleDateString()}
                   </p>
+                  {user.approved_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Approved: {new Date(user.approved_at).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-4">
+                  {user.account_status === 'pending' && (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleStatusChange(user.id, 'approved', user.email, user.full_name)}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleStatusChange(user.id, 'rejected', user.email, user.full_name)}
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+                  {user.account_status === 'approved' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleStatusChange(user.id, 'suspended', user.email, user.full_name)}
+                    >
+                      <Ban className="w-4 h-4 mr-1" />
+                      Suspend
+                    </Button>
+                  )}
                   <div className="w-32">
                     <Select
                       value={currentRole}
@@ -170,16 +260,16 @@ export const UserManagement = () => {
           <p className="text-2xl font-bold">{users.length}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-muted-foreground mb-1">Free</p>
-          <p className="text-2xl font-bold">{users.filter(u => u.user_roles?.[0]?.role === 'free' || !u.user_roles?.length).length}</p>
+          <p className="text-muted-foreground mb-1">Pending</p>
+          <p className="text-2xl font-bold">{users.filter(u => u.account_status === 'pending').length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-muted-foreground mb-1">Approved</p>
+          <p className="text-2xl font-bold">{users.filter(u => u.account_status === 'approved').length}</p>
         </Card>
         <Card className="p-4">
           <p className="text-muted-foreground mb-1">Premium</p>
           <p className="text-2xl font-bold">{users.filter(u => u.user_roles?.[0]?.role === 'premium').length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-muted-foreground mb-1">Admin</p>
-          <p className="text-2xl font-bold">{users.filter(u => u.user_roles?.[0]?.role === 'admin').length}</p>
         </Card>
       </div>
 

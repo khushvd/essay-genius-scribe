@@ -35,6 +35,18 @@ const Dashboard = () => {
         .single();
       
       setProfile(profileData);
+      
+      // Check account status
+      if (profileData?.account_status === "pending") {
+        navigate("/pending-approval");
+        return;
+      } else if (profileData?.account_status === "rejected" || profileData?.account_status === "suspended") {
+        await supabase.auth.signOut();
+        toast.error(`Your account has been ${profileData.account_status}`);
+        navigate("/auth");
+        return;
+      }
+      
       setLoading(false);
     };
 

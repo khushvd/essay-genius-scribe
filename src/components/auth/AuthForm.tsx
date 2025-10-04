@@ -72,8 +72,8 @@ export const AuthForm = () => {
         });
         
         if (error) throw error;
-        toast.success("Account created successfully!");
-        navigate("/dashboard");
+        toast.success("Account created successfully! Awaiting approval.");
+        navigate("/pending-approval");
       }
     } catch (error: any) {
       toast.error(error.message);

@@ -8,6 +8,7 @@ import { EssaysOverview } from "@/components/admin/EssaysOverview";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { PortfolioManager } from "@/components/admin/PortfolioManager";
 import { UserManagement } from "@/components/admin/UserManagement";
+import { TrainingDataReview } from "@/components/admin/TrainingDataReview";
 
 interface AdminDashboardProps {
   user: any;
@@ -45,11 +46,12 @@ const AdminDashboard = ({ user, profile }: AdminDashboardProps) => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="essays">Essays</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="training">Training Data</TabsTrigger>
           </TabsList>
 
           <TabsContent value="essays">
@@ -66,6 +68,10 @@ const AdminDashboard = ({ user, profile }: AdminDashboardProps) => {
 
           <TabsContent value="users">
             <UserManagement />
+          </TabsContent>
+
+          <TabsContent value="training">
+            <TrainingDataReview />
           </TabsContent>
         </Tabs>
       </main>

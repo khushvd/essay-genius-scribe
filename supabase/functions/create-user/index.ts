@@ -81,7 +81,24 @@ serve(async (req) => {
       );
     }
 
-    // Profile is created by trigger, so we just need to assign role
+    // Profile is created by trigger, update account_status
+    // Admins are auto-approved, others need approval
+    if (role === 'admin') {
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({ 
+          account_status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', newUser.user.id);
+
+      if (updateError) {
+        console.error('Error updating profile status:', updateError);
+      }
+    }
+
+    // Assign role
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
@@ -91,11 +108,25 @@ serve(async (req) => {
 
     if (roleError) {
       console.error('Error assigning role:', roleError);
-      // User was created but role assignment failed
       return new Response(
         JSON.stringify({ error: 'User created but role assignment failed', userId: newUser.user.id }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Send invite email
+    try {
+      await supabaseAdmin.functions.invoke('send-user-emails', {
+        body: {
+          type: 'invite',
+          recipientEmail: email,
+          recipientName: fullName,
+          temporaryPassword: password,
+        }
+      });
+    } catch (emailError) {
+      console.error('Error sending invite email:', emailError);
+      // Don't fail if email doesn't send
     }
 
     return new Response(

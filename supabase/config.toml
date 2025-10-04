@@ -14,3 +14,12 @@ verify_jwt = true
 
 [functions.create-user]
 verify_jwt = true
+
+[functions.send-user-emails]
+verify_jwt = true
+
+[functions.export-essay-docx]
+verify_jwt = true
+
+[functions.create-training-snapshot]
+verify_jwt = true
