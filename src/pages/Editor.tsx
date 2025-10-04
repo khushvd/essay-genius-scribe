@@ -185,10 +185,9 @@ const Editor = () => {
             <Button 
               className="fixed bottom-4 right-4 lg:hidden z-50 shadow-lg"
               size="lg"
-              disabled={!hasMinContent}
             >
               <Sparkles className="w-4 h-4 mr-2" />
-              Get Feedback
+              View Feedback
             </Button>
           </DrawerTrigger>
           <DrawerContent className="h-[85vh]">

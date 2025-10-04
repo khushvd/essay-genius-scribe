@@ -15,9 +15,9 @@ serve(async (req) => {
   try {
     const { essayId, content, collegeId, programmeId, cvData, englishVariant } = await req.json();
 
-    if (!content || !collegeId || !programmeId) {
+    if (!content) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Content is required" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -27,29 +27,35 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch successful essays for this college and programme
-    const { data: successfulEssays, error: essaysError } = await supabase
-      .from('successful_essays')
-      .select('essay_content, key_strategies, performance_score')
-      .eq('college_id', collegeId)
-      .eq('programme_id', programmeId)
-      .order('performance_score', { ascending: false })
-      .limit(5);
+    // Fetch successful essays only if college and programme are provided
+    let ragContext = 'No specific college/programme context provided. Providing general editorial guidance based on best practices for college essays.';
+    
+    if (collegeId && programmeId) {
+      const { data: successfulEssays, error: essaysError } = await supabase
+        .from('successful_essays')
+        .select('essay_content, key_strategies, performance_score')
+        .eq('college_id', collegeId)
+        .eq('programme_id', programmeId)
+        .order('performance_score', { ascending: false })
+        .limit(5);
 
-    if (essaysError) {
-      console.error('Error fetching successful essays:', essaysError);
-    }
+      if (essaysError) {
+        console.error('Error fetching successful essays:', essaysError);
+      }
 
-    // Construct RAG context
-    const ragContext = successfulEssays && successfulEssays.length > 0
-      ? successfulEssays.map((essay, idx) => `
+      // Construct RAG context if we have successful essays
+      if (successfulEssays && successfulEssays.length > 0) {
+        ragContext = successfulEssays.map((essay, idx) => `
 Example Essay ${idx + 1} (Score: ${essay.performance_score}/100):
 ${essay.essay_content.substring(0, 500)}...
 
 Key Strategies Used:
 ${JSON.stringify(essay.key_strategies, null, 2)}
-`).join('\n\n---\n\n')
-      : 'No successful essays available for this college and programme combination.';
+`).join('\n\n---\n\n');
+      } else {
+        ragContext = 'No successful essays available for this college and programme combination. Providing general editorial guidance.';
+      }
+    }
 
     // Build specialized prompt
     const systemPrompt = `You are an expert editor for Sandwich, a college essay editing platform. Your role is to provide editorial feedback based on patterns from successful essays.

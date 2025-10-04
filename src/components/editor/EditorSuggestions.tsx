@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { FileEdit, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FileEdit, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SuggestionCard from "./SuggestionCard";
@@ -44,6 +45,14 @@ const EditorSuggestions = ({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+
+  // Auto-analyze on mount if content exists
+  useEffect(() => {
+    if (content.trim() && content.length >= 50 && !hasAnalyzed) {
+      handleAnalyze();
+    }
+  }, []); // Only run on mount
 
   const handleAnalyze = async () => {
     if (!content.trim()) {
@@ -85,6 +94,7 @@ const EditorSuggestions = ({
       } else {
         toast.success("Your essay looks great! No critical feedback at this time.");
       }
+      setHasAnalyzed(true);
     } catch (err) {
       console.error('Error calling analyze-essay:', err);
       toast.error("Failed to analyze essay. Please try again.");
@@ -116,44 +126,55 @@ const EditorSuggestions = ({
   return (
     <div className="h-full flex flex-col bg-card border-l border-border">
       <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-2 mb-2">
-          <FileEdit className="w-5 h-5 text-primary" />
-          <h2 className="font-semibold text-lg">Editorial Feedback</h2>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <FileEdit className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold text-lg">Editorial Feedback</h2>
+          </div>
+          {hasAnalyzed && !analyzing && (
+            <Button
+              onClick={handleAnalyze}
+              disabled={!content.trim() || content.length < 50}
+              size="sm"
+              variant="ghost"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          )}
         </div>
-        <p className="text-xs text-muted-foreground mb-3">
+        <p className="text-xs text-muted-foreground">
           {collegeId && programmeId ? '✓' : '⚠️'} {feedbackMode}
         </p>
-        <Button
-          onClick={handleAnalyze}
-          disabled={analyzing || !content.trim() || content.length < 50}
-          className="w-full"
-          variant="default"
-        >
-          {analyzing ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <FileEdit className="w-4 h-4 mr-2" />
-              Get Editorial Feedback
-            </>
-          )}
-        </Button>
-        {content.length < 50 && (
-          <p className="text-xs text-muted-foreground mt-2">Write at least 50 characters to get feedback</p>
-        )}
       </div>
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
-          {suggestions.length === 0 && !analyzing && (
+          {analyzing && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Analyzing your essay...</span>
+              </div>
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          )}
+          
+          {suggestions.length === 0 && !analyzing && hasAnalyzed && (
             <div className="text-center py-8 text-muted-foreground">
               <FileEdit className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="text-sm">
-                Click the button above to get {collegeId && programmeId ? 'personalized' : 'generic'} editorial feedback
-                {collegeId && programmeId ? ' based on successful essays' : ''}.
+                Your essay looks great! No suggestions at this time.
+              </p>
+            </div>
+          )}
+          
+          {suggestions.length === 0 && !analyzing && !hasAnalyzed && content.length < 50 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileEdit className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">
+                Write at least 50 characters to get {collegeId && programmeId ? 'personalized' : 'generic'} editorial feedback.
               </p>
             </div>
           )}
