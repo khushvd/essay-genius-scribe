@@ -3,9 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Sparkles } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import EditorSuggestions from "@/components/editor/EditorSuggestions";
 
 const Editor = () => {
   const { id } = useParams();
@@ -58,6 +59,13 @@ const Editor = () => {
     }
   };
 
+  const handleApplySuggestion = (suggestion: any) => {
+    const before = content.substring(0, suggestion.location.start);
+    const after = content.substring(suggestion.location.end);
+    const newContent = before + suggestion.suggestion + after;
+    setContent(newContent);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
@@ -70,7 +78,7 @@ const Editor = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
+    <div className="min-h-screen bg-gradient-subtle flex flex-col">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -103,31 +111,30 @@ const Editor = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-card rounded-2xl shadow-soft border border-border p-8 mb-6">
-            <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-              <Sparkles className="w-4 h-4" />
-              <span>AI-powered suggestions coming soon</span>
+      <main className="flex-1 flex overflow-hidden">
+        <div className="flex-1 overflow-auto">
+          <div className="container mx-auto px-4 py-8 max-w-4xl">
+            <div className="bg-card rounded-2xl shadow-soft border border-border p-8">
+              <Textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="min-h-[600px] font-serif text-base leading-relaxed resize-none border-0 focus-visible:ring-0 p-0"
+                placeholder="Write your essay here..."
+              />
             </div>
-            <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[500px] font-serif text-base leading-relaxed resize-none border-0 focus-visible:ring-0 p-0"
-              placeholder="Write your essay here..."
-            />
           </div>
-
-          <div className="bg-accent/10 border border-accent/20 rounded-xl p-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              AI Recommendations
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              AI-powered personalized recommendations based on successful essays for{" "}
-              {essay.colleges?.name} will appear here. This feature uses Claude AI trained on top-performing essays.
-            </p>
-          </div>
+        </div>
+        
+        <div className="w-[400px] hidden lg:block">
+          <EditorSuggestions
+            essayId={id!}
+            content={content}
+            collegeId={essay.college_id}
+            programmeId={essay.programme_id}
+            cvData={essay.cv_data}
+            englishVariant={essay.programmes?.english_variant || "american"}
+            onApplySuggestion={handleApplySuggestion}
+          />
         </div>
       </main>
     </div>

@@ -1,1 +1,4 @@
 project_id = "fsrelhcbfrpfprmzkjmo"
+
+[functions.analyze-essay]
+verify_jwt = true
