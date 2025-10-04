@@ -64,6 +64,8 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
   const [loading, setLoading] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
   const [questionnaireOpen, setQuestionnaireOpen] = useState(false);
+  const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
+  const [questionnaireText, setQuestionnaireText] = useState("");
 
   useEffect(() => {
     const fetchColleges = async () => {
@@ -146,6 +148,38 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
     }
   };
 
+  const handleQuestionnaireUpload = async (file: File) => {
+    try {
+      const fileType = file.type;
+      let extractedText = "";
+
+      if (fileType === "application/pdf") {
+        // Handle PDF
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(" ");
+          extractedText += pageText + "\n";
+        }
+      } else {
+        // Handle DOCX
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        extractedText = result.value;
+      }
+
+      setQuestionnaireText(extractedText);
+      setQuestionnaireFile(file);
+      toast.success("Questionnaire uploaded successfully!");
+    } catch (error) {
+      console.error("Questionnaire parsing error:", error);
+      toast.error("Failed to parse document. Please try filling the form instead.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -165,11 +199,26 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
       // Prepare CV data
       const cvData = cvText.trim() ? { text: cvText, source: resumeFile ? "file" : "manual" } : null;
       
-      // Prepare questionnaire data (only include non-empty fields)
-      const filteredQuestionnaire = Object.entries(questionnaireData).reduce((acc, [key, value]) => {
-        if (value.trim()) acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>);
+      // Prepare questionnaire data
+      let questionnairePayload = null;
+      if (questionnaireFile && questionnaireText.trim()) {
+        // If file uploaded, use extracted text
+        questionnairePayload = { 
+          questionnaireText,
+          source: "file",
+          fileName: questionnaireFile.name 
+        };
+      } else {
+        // If manually filled, use form fields
+        const filteredQuestionnaire = Object.entries(questionnaireData).reduce((acc, [key, value]) => {
+          if (value.trim()) acc[key] = value;
+          return acc;
+        }, {} as Record<string, string>);
+        
+        if (Object.keys(filteredQuestionnaire).length > 0) {
+          questionnairePayload = { ...filteredQuestionnaire, source: "manual" };
+        }
+      }
 
       const { data, error } = await supabase
         .from("essays")
@@ -183,7 +232,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
           custom_college_name: isCustomCollege ? customCollegeName : null,
           custom_programme_name: isCustomCollege && customProgrammeName ? customProgrammeName : null,
           cv_data: cvData,
-          questionnaire_data: Object.keys(filteredQuestionnaire).length > 0 ? filteredQuestionnaire : null,
+          questionnaire_data: questionnairePayload,
           status: "draft",
         })
         .select()
@@ -358,7 +407,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="resume-upload" className="cursor-pointer">
                     <div className="border-2 border-dashed rounded-md p-6 hover:border-primary transition-colors text-center">
                       <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
@@ -374,7 +423,13 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleResumeUpload(file);
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error("File size must be less than 5MB");
+                          return;
+                        }
+                        handleResumeUpload(file);
+                      }
                     }}
                   />
                 </div>
@@ -385,7 +440,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or paste text</span>
+                  <span className="bg-background px-2 text-muted-foreground">Or fill manually</span>
                 </div>
               </div>
 
@@ -407,61 +462,127 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4 pt-4">
               <p className="text-sm text-muted-foreground">
-                Help us understand your story better for more personalized feedback
+                Upload a document or fill out the form to help us understand your background
               </p>
               
-              <div className="space-y-2">
-                <Label htmlFor="academic-interests">Academic Interests</Label>
-                <Textarea
-                  id="academic-interests"
-                  value={questionnaireData.academicInterests}
-                  onChange={(e) => setQuestionnaireData(prev => ({ ...prev, academicInterests: e.target.value }))}
-                  placeholder="What subjects or fields excite you most?"
-                  rows={2}
-                />
-              </div>
+              <Tabs defaultValue="upload" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="upload">Upload Document</TabsTrigger>
+                  <TabsTrigger value="form">Fill Form</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="upload" className="space-y-2">
+                  {questionnaireFile ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                        <FileText className="h-4 w-4" />
+                        <span className="text-sm flex-1">{questionnaireFile.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setQuestionnaireFile(null);
+                            setQuestionnaireText("");
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-md max-h-32 overflow-y-auto">
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                          {questionnaireText.slice(0, 500)}...
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Label htmlFor="questionnaire-upload" className="cursor-pointer">
+                        <div className="border-2 border-dashed rounded-md p-8 hover:border-primary transition-colors text-center">
+                          <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground mb-1">
+                            Click to upload questionnaire document
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Supports PDF and DOCX files (max 5MB)
+                          </p>
+                        </div>
+                      </Label>
+                      <Input
+                        id="questionnaire-upload"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              toast.error("File size must be less than 5MB");
+                              return;
+                            }
+                            handleQuestionnaireUpload(file);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="form" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="academic-interests">Academic Interests</Label>
+                    <Textarea
+                      id="academic-interests"
+                      value={questionnaireData.academicInterests}
+                      onChange={(e) => setQuestionnaireData(prev => ({ ...prev, academicInterests: e.target.value }))}
+                      placeholder="What subjects or fields excite you most?"
+                      rows={2}
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="extracurriculars">Extracurricular Activities</Label>
-                <Textarea
-                  id="extracurriculars"
-                  value={questionnaireData.extracurriculars}
-                  onChange={(e) => setQuestionnaireData(prev => ({ ...prev, extracurriculars: e.target.value }))}
-                  placeholder="Key activities, clubs, sports, volunteering..."
-                  rows={2}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="extracurriculars">Extracurricular Activities</Label>
+                    <Textarea
+                      id="extracurriculars"
+                      value={questionnaireData.extracurriculars}
+                      onChange={(e) => setQuestionnaireData(prev => ({ ...prev, extracurriculars: e.target.value }))}
+                      placeholder="Key activities, clubs, sports, volunteering..."
+                      rows={2}
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="career-goals">Career Goals</Label>
-                <Textarea
-                  id="career-goals"
-                  value={questionnaireData.careerGoals}
-                  onChange={(e) => setQuestionnaireData(prev => ({ ...prev, careerGoals: e.target.value }))}
-                  placeholder="What are your professional aspirations?"
-                  rows={2}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="career-goals">Career Goals</Label>
+                    <Textarea
+                      id="career-goals"
+                      value={questionnaireData.careerGoals}
+                      onChange={(e) => setQuestionnaireData(prev => ({ ...prev, careerGoals: e.target.value }))}
+                      placeholder="What are your professional aspirations?"
+                      rows={2}
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="challenges">Personal Challenges or Growth Moments</Label>
-                <Textarea
-                  id="challenges"
-                  value={questionnaireData.challenges}
-                  onChange={(e) => setQuestionnaireData(prev => ({ ...prev, challenges: e.target.value }))}
-                  placeholder="Significant challenges you've overcome or pivotal growth experiences..."
-                  rows={2}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="challenges">Personal Challenges or Growth Moments</Label>
+                    <Textarea
+                      id="challenges"
+                      value={questionnaireData.challenges}
+                      onChange={(e) => setQuestionnaireData(prev => ({ ...prev, challenges: e.target.value }))}
+                      placeholder="Significant challenges you've overcome or pivotal growth experiences..."
+                      rows={2}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CollapsibleContent>
           </Collapsible>
 
           <div className="space-y-2">
             <Label>Initial Draft</Label>
-            <Tabs defaultValue="paste" className="w-full">
+            <Tabs defaultValue="upload" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="paste">Paste Text</TabsTrigger>
                 <TabsTrigger value="upload">Upload Document</TabsTrigger>
+                <TabsTrigger value="paste">Paste Text</TabsTrigger>
               </TabsList>
               
               <TabsContent value="paste" className="space-y-2">
