@@ -31,6 +31,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState("all");
   const [collegeId, setCollegeId] = useState("");
   const [programmeId, setProgrammeId] = useState("");
   const [colleges, setColleges] = useState<any[]>([]);
@@ -39,16 +40,21 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
 
   useEffect(() => {
     const fetchColleges = async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("colleges")
         .select("*")
         .order("name");
       
+      if (selectedCountry !== "all") {
+        query = query.eq("country", selectedCountry);
+      }
+      
+      const { data } = await query;
       if (data) setColleges(data);
     };
 
     fetchColleges();
-  }, []);
+  }, [selectedCountry]);
 
   useEffect(() => {
     const fetchProgrammes = async () => {
@@ -111,14 +117,30 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Essay Title</Label>
+            <Label htmlFor="title">Essay Prompt (if any)</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Personal Statement for Harvard"
-              required
+              placeholder="e.g., Describe a challenge you overcame..."
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="all">All Countries</SelectItem>
+                <SelectItem value="USA">USA</SelectItem>
+                <SelectItem value="UK">UK</SelectItem>
+                <SelectItem value="Canada">Canada</SelectItem>
+                <SelectItem value="Australia">Australia</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -128,7 +150,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
                 <SelectTrigger>
                   <SelectValue placeholder="Select college" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background z-50">
                   {colleges.map((college) => (
                     <SelectItem key={college.id} value={college.id}>
                       {college.name}
@@ -148,7 +170,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
                 <SelectTrigger>
                   <SelectValue placeholder="Select programme" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background z-50">
                   {programmes.map((programme) => (
                     <SelectItem key={programme.id} value={programme.id}>
                       {programme.name}

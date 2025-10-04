@@ -44,7 +44,7 @@ export type Database = {
           id: string
           programme_id: string | null
           status: Database["public"]["Enums"]["essay_status"] | null
-          title: string
+          title: string | null
           updated_at: string | null
           writer_id: string
         }
@@ -56,7 +56,7 @@ export type Database = {
           id?: string
           programme_id?: string | null
           status?: Database["public"]["Enums"]["essay_status"] | null
-          title: string
+          title?: string | null
           updated_at?: string | null
           writer_id: string
         }
@@ -68,7 +68,7 @@ export type Database = {
           id?: string
           programme_id?: string | null
           status?: Database["public"]["Enums"]["essay_status"] | null
-          title?: string
+          title?: string | null
           updated_at?: string | null
           writer_id?: string
         }
