@@ -6,6 +6,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { PenLine } from "lucide-react";
+import { z } from "zod";
+
+// Validation schemas
+const authValidationSchema = z.object({
+  email: z.string()
+    .trim()
+    .email("Invalid email address")
+    .max(255, "Email must be less than 255 characters"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(100, "Password must be less than 100 characters"),
+  fullName: z.string()
+    .trim()
+    .min(1, "Full name is required")
+    .max(100, "Full name must be less than 100 characters")
+    .optional(),
+});
 
 export const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -20,6 +37,19 @@ export const AuthForm = () => {
     setLoading(true);
 
     try {
+      // Validate input
+      const validationData = isLogin 
+        ? { email, password }
+        : { email, password, fullName };
+      
+      const validationResult = authValidationSchema.safeParse(validationData);
+      
+      if (!validationResult.success) {
+        toast.error(validationResult.error.errors[0].message);
+        setLoading(false);
+        return;
+      }
+
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
           email,

@@ -80,10 +80,30 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
+    // Get JWT from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Initialize Supabase client with service role for data access
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Verify the authenticated user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Fetch essay details including all metadata
     const { data: essayData, error: essayError } = await supabase
@@ -107,6 +127,19 @@ serve(async (req) => {
 
     if (essayError) {
       console.error('Error fetching essay:', essayError);
+      return new Response(
+        JSON.stringify({ error: 'Essay not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Authorization check: ensure user owns this essay
+    if (essayData.writer_id !== user.id) {
+      console.error('Authorization failed: User does not own this essay');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: You do not have permission to analyze this essay' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Extract metadata

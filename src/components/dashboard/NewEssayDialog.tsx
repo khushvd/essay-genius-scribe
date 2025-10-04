@@ -29,9 +29,37 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { ChevronDown, Upload, FileText, X } from "lucide-react";
+import { z } from "zod";
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// Validation schemas
+const essayValidationSchema = z.object({
+  title: z.string()
+    .trim()
+    .min(1, "Title is required")
+    .max(200, "Title must be less than 200 characters"),
+  content: z.string()
+    .trim()
+    .min(50, "Essay content must be at least 50 characters")
+    .max(50000, "Essay content must be less than 50,000 characters"),
+  degreeLevel: z.enum(["bachelors", "masters", "phd"]),
+  cvText: z.string()
+    .max(20000, "CV text must be less than 20,000 characters")
+    .optional(),
+  questionnaireText: z.string()
+    .max(20000, "Questionnaire text must be less than 20,000 characters")
+    .optional(),
+});
+
+const fileValidationSchema = z.object({
+  size: z.number().max(5 * 1024 * 1024, "File size must be less than 5MB"),
+  type: z.string().refine(
+    (type) => ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"].includes(type),
+    "File must be PDF or DOCX"
+  ),
+});
 
 interface NewEssayDialogProps {
   open: boolean;
@@ -106,18 +134,29 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
 
   const handleFileUpload = async (file: File) => {
     try {
+      // Validate file
+      fileValidationSchema.parse({ size: file.size, type: file.type });
+      
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       setContent(result.value);
       setUploadedFile(file);
       toast.success("Document uploaded successfully!");
     } catch (error) {
-      toast.error("Failed to parse document. Please try copying the text instead.");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        console.error("File parsing error:", error);
+        toast.error("Failed to parse document. Please try copying the text instead.");
+      }
     }
   };
 
   const handleResumeUpload = async (file: File) => {
     try {
+      // Validate file
+      fileValidationSchema.parse({ size: file.size, type: file.type });
+      
       const fileType = file.type;
       let extractedText = "";
 
@@ -143,13 +182,20 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
       setResumeFile(file);
       toast.success("Resume uploaded successfully!");
     } catch (error) {
-      console.error("Resume parsing error:", error);
-      toast.error("Failed to parse resume. Please try pasting the text instead.");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        console.error("Resume parsing error:", error);
+        toast.error("Failed to parse resume. Please try pasting the text instead.");
+      }
     }
   };
 
   const handleQuestionnaireUpload = async (file: File) => {
     try {
+      // Validate file
+      fileValidationSchema.parse({ size: file.size, type: file.type });
+      
       const fileType = file.type;
       let extractedText = "";
 
@@ -175,27 +221,47 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
       setQuestionnaireFile(file);
       toast.success("Questionnaire uploaded successfully!");
     } catch (error) {
-      console.error("Questionnaire parsing error:", error);
-      toast.error("Failed to parse document. Please try filling the form instead.");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        console.error("Questionnaire parsing error:", error);
+        toast.error("Failed to parse document. Please try filling the form instead.");
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!content.trim()) {
-      toast.error("Please provide essay content either by typing or uploading a document.");
-      return;
-    }
-
-    if (isCustomCollege && !customCollegeName.trim()) {
-      toast.error("Please enter a college name.");
-      return;
-    }
-
     setLoading(true);
 
     try {
+      // Validate essay data
+      const validationResult = essayValidationSchema.safeParse({
+        title: title.trim(),
+        content: content.trim(),
+        degreeLevel,
+        cvText: cvText.trim() || undefined,
+        questionnaireText: questionnaireText.trim() || undefined,
+      });
+
+      if (!validationResult.success) {
+        toast.error(validationResult.error.errors[0].message);
+        setLoading(false);
+        return;
+      }
+    
+      if (!content.trim()) {
+        toast.error("Please provide essay content either by typing or uploading a document.");
+        setLoading(false);
+        return;
+      }
+
+      if (isCustomCollege && !customCollegeName.trim()) {
+        toast.error("Please enter a college name.");
+        setLoading(false);
+        return;
+      }
+
       // Prepare CV data
       const cvData = cvText.trim() ? { text: cvText, source: resumeFile ? "file" : "manual" } : null;
       
