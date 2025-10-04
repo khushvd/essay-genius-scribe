@@ -43,9 +43,13 @@ export type Database = {
           college_id: string | null
           content: string
           created_at: string | null
+          custom_college_name: string | null
+          custom_programme_name: string | null
           cv_data: Json | null
+          degree_level: Database["public"]["Enums"]["degree_level"] | null
           id: string
           programme_id: string | null
+          questionnaire_data: Json | null
           status: Database["public"]["Enums"]["essay_status"] | null
           title: string | null
           updated_at: string | null
@@ -55,9 +59,13 @@ export type Database = {
           college_id?: string | null
           content: string
           created_at?: string | null
+          custom_college_name?: string | null
+          custom_programme_name?: string | null
           cv_data?: Json | null
+          degree_level?: Database["public"]["Enums"]["degree_level"] | null
           id?: string
           programme_id?: string | null
+          questionnaire_data?: Json | null
           status?: Database["public"]["Enums"]["essay_status"] | null
           title?: string | null
           updated_at?: string | null
@@ -67,9 +75,13 @@ export type Database = {
           college_id?: string | null
           content?: string
           created_at?: string | null
+          custom_college_name?: string | null
+          custom_programme_name?: string | null
           cv_data?: Json | null
+          degree_level?: Database["public"]["Enums"]["degree_level"] | null
           id?: string
           programme_id?: string | null
+          questionnaire_data?: Json | null
           status?: Database["public"]["Enums"]["essay_status"] | null
           title?: string | null
           updated_at?: string | null
@@ -205,6 +217,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      degree_level: "bachelors" | "masters"
       english_variant: "british" | "american"
       essay_status: "draft" | "in_review" | "completed"
     }
@@ -334,6 +347,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      degree_level: ["bachelors", "masters"],
       english_variant: ["british", "american"],
       essay_status: ["draft", "in_review", "completed"],
     },
