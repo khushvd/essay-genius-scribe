@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { Sparkles } from 'lucide-react';
-import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Sparkles } from "lucide-react";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import {
   EditorHeader,
   EditorPanel,
@@ -13,37 +13,38 @@ import {
   useEssayData,
   useAutoSave,
   useEssaySuggestions,
-} from '@/features/essay-editor';
+} from "@/features/essay-editor";
 
 const Editor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Use custom hooks
   const { essay, loading } = useEssayData(id);
   const { isSaving, lastSaved, saveNow } = useAutoSave({
-    essayId: id || '',
+    essayId: id || "",
     content,
-    originalContent: essay?.content || '',
+    originalContent: essay?.content || "",
   });
-  const { suggestions, appliedSuggestions, setSuggestions, applySuggestion, dismissSuggestion } =
-    useEssaySuggestions(id || '');
+  const { suggestions, appliedSuggestions, setSuggestions, applySuggestion, dismissSuggestion } = useEssaySuggestions(
+    id || "",
+  );
 
   // Initialize content when essay loads
   useEffect(() => {
-    if (essay && content === '') {
+    if (essay?.content && essay.content !== content) {
       setContent(essay.content);
     }
-  }, [essay]);
+  }, [essay?.content]); // Add essay?.content to dependencies;
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await saveNow();
-      toast.success('Essay saved successfully');
+      toast.success("Essay saved successfully");
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -60,43 +61,40 @@ const Editor = () => {
 
     try {
       const session = await supabase.auth.getSession();
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-essay-docx`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.data.session?.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ essayId: essay.id }),
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-essay-docx`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.data.session?.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ essayId: essay.id }),
+      });
 
       if (!response.ok) {
-        throw new Error('Export failed');
+        throw new Error("Export failed");
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      
+
       // Generate filename: college_programme_title.rtf
-      const collegeName = essay.colleges?.name || essay.custom_college_name || 'essay';
-      const programmeName = essay.programmes?.name || essay.custom_programme_name || '';
-      const title = essay.title || 'essay';
-      const filename = `${collegeName}_${programmeName}_${title}`.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
-      
+      const collegeName = essay.colleges?.name || essay.custom_college_name || "essay";
+      const programmeName = essay.programmes?.name || essay.custom_programme_name || "";
+      const title = essay.title || "essay";
+      const filename = `${collegeName}_${programmeName}_${title}`.replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+
       a.download = `${filename}.rtf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success('Essay exported as RTF (opens in Word)');
+      toast.success("Essay exported as RTF (opens in Word)");
     } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export essay');
+      console.error("Export error:", error);
+      toast.error("Failed to export essay");
     }
   };
 
@@ -105,7 +103,7 @@ const Editor = () => {
 
     try {
       const session = await supabase.auth.getSession();
-      const { error } = await supabase.functions.invoke('create-training-snapshot', {
+      const { error } = await supabase.functions.invoke("create-training-snapshot", {
         body: {
           essayId: essay.id,
           originalContent: essay.content,
@@ -120,10 +118,10 @@ const Editor = () => {
       });
 
       if (error) throw error;
-      toast.success('Training snapshot created successfully');
+      toast.success("Training snapshot created successfully");
     } catch (error) {
-      console.error('Mark complete error:', error);
-      toast.error('Failed to create snapshot');
+      console.error("Mark complete error:", error);
+      toast.error("Failed to create snapshot");
     }
   };
 
@@ -149,7 +147,7 @@ const Editor = () => {
         isSaving={isSaving}
         lastSaved={lastSaved}
         saving={saving}
-        onBack={() => navigate('/dashboard')}
+        onBack={() => navigate("/dashboard")}
         onSave={handleSave}
         onExport={handleExportAsWord}
         onMarkComplete={handleMarkComplete}
@@ -180,7 +178,7 @@ const Editor = () => {
               collegeId={essay.college_id}
               programmeId={essay.programme_id}
               cvData={essay.cv_data}
-              englishVariant={(essay.programmes?.english_variant as 'american' | 'british') || 'american'}
+              englishVariant={(essay.programmes?.english_variant as "american" | "british") || "american"}
               collegeName={essay.colleges?.name}
               programmeName={essay.programmes?.name}
               onApply={handleApplySuggestion}
@@ -205,7 +203,7 @@ const Editor = () => {
                 collegeId={essay.college_id}
                 programmeId={essay.programme_id}
                 cvData={essay.cv_data}
-                englishVariant={(essay.programmes?.english_variant as 'american' | 'british') || 'american'}
+                englishVariant={(essay.programmes?.english_variant as "american" | "british") || "american"}
                 collegeName={essay.colleges?.name}
                 programmeName={essay.programmes?.name}
                 onApply={handleApplySuggestion}
