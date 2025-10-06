@@ -17,44 +17,6 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsAuthenticated(!!session);
-
-        // Defer profile fetching with setTimeout
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserProfile(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setRole(null);
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsAuthenticated(!!session);
-      
-      if (session?.user) {
-        setTimeout(() => {
-          fetchUserProfile(session.user.id);
-        }, 0);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
   const fetchUserProfile = async (userId: string) => {
     const profileResult = await profilesService.getProfile(userId);
     
@@ -72,6 +34,63 @@ export const useAuth = () => {
     setRole(roleData?.role || 'free');
     setLoading(false);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    let isInitialized = false;
+
+    // Step 1: Check for existing session FIRST
+    const initializeAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!isMounted) return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsAuthenticated(!!session);
+
+      if (session?.user) {
+        // Fetch profile synchronously on mount
+        await fetchUserProfile(session.user.id);
+      } else {
+        // No session, stop loading immediately
+        setLoading(false);
+      }
+
+      isInitialized = true;
+    };
+
+    // Step 2: Set up auth state listener for FUTURE changes only
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        // Ignore events during initial mount to prevent race condition
+        if (!isInitialized) return;
+        if (!isMounted) return;
+
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsAuthenticated(!!session);
+
+        if (session?.user) {
+          // User logged in or session refreshed
+          await fetchUserProfile(session.user.id);
+        } else {
+          // User logged out
+          setProfile(null);
+          setRole(null);
+          setLoading(false);
+        }
+      }
+    );
+
+    // Initialize auth synchronously
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const signOut = async () => {
     const result = await authService.signOut();
