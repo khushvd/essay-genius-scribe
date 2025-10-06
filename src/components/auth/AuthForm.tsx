@@ -15,8 +15,12 @@ const authValidationSchema = z.object({
     .email("Invalid email address")
     .max(255, "Email must be less than 255 characters"),
   password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .max(100, "Password must be less than 100 characters"),
+    .min(10, "Password must be at least 10 characters")
+    .max(100, "Password must be less than 100 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   fullName: z.string()
     .trim()
     .min(1, "Full name is required")

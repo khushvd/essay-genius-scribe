@@ -98,12 +98,14 @@ serve(async (req) => {
       }
     }
 
-    // Assign role
+    // Assign role (use UPSERT to prevent duplicate key errors)
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
-      .insert({
+      .upsert({
         user_id: newUser.user.id,
         role: role
+      }, {
+        onConflict: 'user_id,role'
       });
 
     if (roleError) {
@@ -112,6 +114,28 @@ serve(async (req) => {
         JSON.stringify({ error: 'User created but role assignment failed', userId: newUser.user.id }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Create audit log entry for admin user creation
+    if (role === 'admin') {
+      const { error: auditError } = await supabaseAdmin
+        .from('admin_audit_log')
+        .insert({
+          admin_id: user.id,
+          action: 'create_admin_user',
+          target_user_id: newUser.user.id,
+          details: {
+            email: email,
+            full_name: fullName,
+            role: role,
+            timestamp: new Date().toISOString()
+          }
+        });
+
+      if (auditError) {
+        console.error('Error creating audit log:', auditError);
+        // Don't fail the request if audit logging fails
+      }
     }
 
     // Send invite email
