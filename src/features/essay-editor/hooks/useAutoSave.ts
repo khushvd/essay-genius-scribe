@@ -59,7 +59,7 @@ export const useAutoSave = ({
   // Warn before leaving with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (isSaving || content !== originalContent) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -67,7 +67,7 @@ export const useAutoSave = ({
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [isSaving, content, originalContent]);
 
   return {
     isSaving,

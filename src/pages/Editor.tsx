@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import {
   EditorHeader,
@@ -23,7 +23,7 @@ const Editor = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Use custom hooks
-  const { essay, loading } = useEssayData(id);
+  const { essay, loading, error, retry } = useEssayData(id);
   const { isSaving, lastSaved, saveNow } = useAutoSave({
     essayId: id || "",
     content,
@@ -135,6 +135,36 @@ const Editor = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Loading editor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <div className="max-w-md w-full mx-4">
+          <div className="bg-card rounded-2xl shadow-soft border border-border p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Failed to Load Essay</h2>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <div className="flex gap-3">
+              <Button 
+                onClick={retry} 
+                className="flex-1"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+              <Button 
+                onClick={() => navigate("/dashboard")} 
+                variant="outline"
+                className="flex-1"
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
