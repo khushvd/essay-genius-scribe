@@ -20,6 +20,7 @@ interface Suggestion {
 }
 
 interface EditorSuggestionsProps {
+  suggestions: Suggestion[];
   essayId: string;
   content: string;
   collegeId: string;
@@ -33,6 +34,7 @@ interface EditorSuggestionsProps {
 }
 
 const EditorSuggestions = ({
+  suggestions,
   essayId,
   content,
   collegeId,
@@ -44,26 +46,25 @@ const EditorSuggestions = ({
   programmeName,
   onSuggestionsUpdate,
 }: EditorSuggestionsProps) => {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [analysisId, setAnalysisId] = useState<string>("");
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
 
-  // Auto-analyze with delay and retry logic
+  // Auto-analyze when all required data is loaded
   useEffect(() => {
     if (!essayId || !content.trim() || content.length < 50 || hasAnalyzed) {
       return;
     }
 
-    // Add 2-second delay to ensure essay data is loaded
-    const timer = setTimeout(() => {
-      handleAnalyze();
-    }, 2000);
+    // Wait for collegeId to load before analyzing
+    if (!collegeId) {
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [essayId, content, hasAnalyzed]);
+    handleAnalyze();
+  }, [essayId, content, collegeId, programmeId, hasAnalyzed]);
 
   const handleAnalyze = async () => {
     if (!content.trim()) {
@@ -79,7 +80,6 @@ const EditorSuggestions = ({
     }
 
     setAnalyzing(true);
-    setSuggestions([]);
     setAppliedSuggestions(new Set());
     setLastAnalysisTime(now);
 
@@ -112,7 +112,6 @@ const EditorSuggestions = ({
       }
 
       if (data?.suggestions) {
-        setSuggestions(data.suggestions);
         onSuggestionsUpdate?.(data.suggestions);
         setAnalysisId(data.analysisId || `analysis-${Date.now()}`);
         toast.success(`Found ${data.suggestions.length} editorial suggestions`);
@@ -142,7 +141,7 @@ const EditorSuggestions = ({
     if (suggestion) {
       await trackSuggestionAction(suggestion, 'dismissed');
     }
-    setSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
+    onSuggestionsUpdate?.(suggestions.filter((s) => s.id !== suggestionId));
   };
 
   const trackSuggestionAction = async (suggestion: Suggestion, action: 'applied' | 'dismissed' | 'ignored') => {

@@ -207,6 +207,7 @@ const Editor = () => {
         <div className="w-[400px] hidden lg:block overflow-auto border-l border-border">
           <div className="p-4 sticky top-0">
             <SuggestionsPanel
+              suggestions={suggestions}
               essayId={id!}
               content={content}
               collegeId={essay.college_id}
@@ -232,6 +233,7 @@ const Editor = () => {
           <DrawerContent className="h-[85vh] overflow-auto">
             <div className="p-4">
               <SuggestionsPanel
+                suggestions={suggestions}
                 essayId={id!}
                 content={content}
                 collegeId={essay.college_id}

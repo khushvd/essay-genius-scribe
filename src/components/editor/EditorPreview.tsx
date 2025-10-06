@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -45,7 +45,7 @@ export const EditorPreview = ({
     }
   };
 
-  const renderContentWithHighlights = () => {
+  const renderContentWithHighlights = useMemo(() => {
     if (!content || suggestions.length === 0) {
       return <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{content}</p>;
     }
@@ -103,14 +103,14 @@ export const EditorPreview = ({
     }
 
     return <div className="font-mono text-sm leading-relaxed">{result}</div>;
-  };
+  }, [content, suggestions, appliedSuggestions, selectedSuggestion]);
 
   return (
     <div className="relative h-full">
       <ScrollArea className="h-full">
-        <div className="p-4">
-          {renderContentWithHighlights()}
-        </div>
+      <div className="p-4">
+        {renderContentWithHighlights}
+      </div>
       </ScrollArea>
 
       {selectedSuggestion && (

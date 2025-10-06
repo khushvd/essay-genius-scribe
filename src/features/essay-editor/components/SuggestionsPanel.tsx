@@ -2,6 +2,7 @@ import { EssayScoreCard } from '@/components/editor/EssayScoreCard';
 import EditorSuggestions from '@/components/editor/EditorSuggestions';
 
 interface SuggestionsPanelProps {
+  suggestions: any[];
   essayId: string;
   content: string;
   collegeId: string | null;
@@ -15,6 +16,7 @@ interface SuggestionsPanelProps {
 }
 
 export const SuggestionsPanel = ({
+  suggestions,
   essayId,
   content,
   collegeId,
@@ -37,6 +39,7 @@ export const SuggestionsPanel = ({
         englishVariant={englishVariant}
       />
       <EditorSuggestions
+        suggestions={suggestions}
         essayId={essayId}
         content={content}
         collegeId={collegeId}
