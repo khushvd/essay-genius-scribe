@@ -42,6 +42,32 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
       setContent(newContent);
       setAppliedSuggestions(prev => new Set(prev).add(suggestion.id));
 
+      // Calculate length difference and adjust subsequent suggestions
+      const lengthDiff = suggestedText.length - originalText.length;
+      
+      if (lengthDiff !== 0) {
+        const updatedSuggestions = suggestions.map(s => {
+          // Skip the suggestion we just applied
+          if (s.id === suggestion.id) return s;
+          
+          // Only adjust suggestions that start after the current suggestion's end position
+          if (s.location.start >= end) {
+            return {
+              ...s,
+              location: {
+                start: s.location.start + lengthDiff,
+                end: s.location.end + lengthDiff
+              }
+            };
+          }
+          
+          // Keep suggestions before or overlapping unchanged
+          return s;
+        });
+        
+        setSuggestions(updatedSuggestions);
+      }
+
       // Track the action
       analyticsService.trackSuggestionAction(
         essayId,
