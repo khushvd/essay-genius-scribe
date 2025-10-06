@@ -12,7 +12,6 @@ interface EditorHeaderProps {
   onBack: () => void;
   onSave: () => void;
   onExport: () => void;
-  onMarkComplete: () => void;
 }
 
 export const EditorHeader = ({
@@ -23,7 +22,6 @@ export const EditorHeader = ({
   onBack,
   onSave,
   onExport,
-  onMarkComplete,
 }: EditorHeaderProps) => {
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -58,9 +56,6 @@ export const EditorHeader = ({
             <Button onClick={onExport} variant="outline" size="sm">
               <Download className="w-4 h-4 mr-2" />
               Export
-            </Button>
-            <Button onClick={onMarkComplete} variant="outline" size="sm">
-              Mark Complete
             </Button>
             <Button onClick={onSave} disabled={saving}>
               <Save className="w-4 h-4 mr-2" />

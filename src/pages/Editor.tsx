@@ -95,37 +95,21 @@ const Editor = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
+      // Update last_exported_at timestamp
+      const { error: updateError } = await supabase
+        .from('essays')
+        .update({ last_exported_at: new Date().toISOString() })
+        .eq('id', essay.id);
+
+      if (updateError) {
+        console.error('Failed to update export timestamp:', updateError);
+        // Don't show error to user - export succeeded
+      }
+
       toast.success("Essay exported as RTF (opens in Word)");
     } catch (error) {
       console.error("Export error:", error);
       toast.error("Failed to export essay");
-    }
-  };
-
-  const handleMarkComplete = async () => {
-    if (!essay) return;
-
-    try {
-      const session = await supabase.auth.getSession();
-      const { error } = await supabase.functions.invoke("create-training-snapshot", {
-        body: {
-          essayId: essay.id,
-          originalContent: essay.content,
-          finalContent: content,
-          suggestionsApplied: Array.from(appliedSuggestions),
-          suggestionsDismissed: [],
-          manualEdits: [],
-        },
-        headers: {
-          Authorization: `Bearer ${session.data.session?.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      toast.success("Training snapshot created successfully");
-    } catch (error) {
-      console.error("Mark complete error:", error);
-      toast.error("Failed to create snapshot");
     }
   };
 
@@ -184,7 +168,6 @@ const Editor = () => {
         onBack={() => navigate("/dashboard")}
         onSave={handleSave}
         onExport={handleExportAsWord}
-        onMarkComplete={handleMarkComplete}
       />
 
       <main className="flex-1 flex overflow-hidden">

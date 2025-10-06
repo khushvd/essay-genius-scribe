@@ -53,6 +53,8 @@ export interface Essay {
   questionnaire_data: QuestionnaireData | null;
   created_at: string;
   updated_at: string;
+  last_exported_at: string | null;
+  completion_status: 'in_progress' | 'completed';
   colleges?: College;
   programmes?: Programme;
 }

@@ -174,6 +174,7 @@ export type Database = {
       essays: {
         Row: {
           college_id: string | null
+          completion_status: Database["public"]["Enums"]["completion_status"]
           content: string
           created_at: string | null
           custom_college_name: string | null
@@ -181,6 +182,7 @@ export type Database = {
           cv_data: Json | null
           degree_level: Database["public"]["Enums"]["degree_level"] | null
           id: string
+          last_exported_at: string | null
           programme_id: string | null
           questionnaire_data: Json | null
           status: Database["public"]["Enums"]["essay_status"] | null
@@ -190,6 +192,7 @@ export type Database = {
         }
         Insert: {
           college_id?: string | null
+          completion_status?: Database["public"]["Enums"]["completion_status"]
           content: string
           created_at?: string | null
           custom_college_name?: string | null
@@ -197,6 +200,7 @@ export type Database = {
           cv_data?: Json | null
           degree_level?: Database["public"]["Enums"]["degree_level"] | null
           id?: string
+          last_exported_at?: string | null
           programme_id?: string | null
           questionnaire_data?: Json | null
           status?: Database["public"]["Enums"]["essay_status"] | null
@@ -206,6 +210,7 @@ export type Database = {
         }
         Update: {
           college_id?: string | null
+          completion_status?: Database["public"]["Enums"]["completion_status"]
           content?: string
           created_at?: string | null
           custom_college_name?: string | null
@@ -213,6 +218,7 @@ export type Database = {
           cv_data?: Json | null
           degree_level?: Database["public"]["Enums"]["degree_level"] | null
           id?: string
+          last_exported_at?: string | null
           programme_id?: string | null
           questionnaire_data?: Json | null
           status?: Database["public"]["Enums"]["essay_status"] | null
@@ -484,6 +490,7 @@ export type Database = {
     Enums: {
       account_status: "pending" | "approved" | "suspended" | "rejected"
       app_role: "free" | "premium" | "admin"
+      completion_status: "in_progress" | "completed"
       degree_level: "bachelors" | "masters"
       english_variant: "british" | "american"
       essay_status: "draft" | "in_review" | "completed"
@@ -616,6 +623,7 @@ export const Constants = {
     Enums: {
       account_status: ["pending", "approved", "suspended", "rejected"],
       app_role: ["free", "premium", "admin"],
+      completion_status: ["in_progress", "completed"],
       degree_level: ["bachelors", "masters"],
       english_variant: ["british", "american"],
       essay_status: ["draft", "in_review", "completed"],

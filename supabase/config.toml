@@ -26,3 +26,6 @@ verify_jwt = true
 
 [functions.create-training-snapshot]
 verify_jwt = true
+
+[functions.auto-complete-essays]
+verify_jwt = false
