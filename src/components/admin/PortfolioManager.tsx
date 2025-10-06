@@ -124,8 +124,8 @@ export const PortfolioManager = () => {
       
       // Pre-fill form with AI parsed data
       setFormData({
-        college_id: '',
-        programme_id: '',
+        college_id: data.college_id || '',
+        programme_id: data.programme_id || '',
         essay_title: data.essay_title || '',
         essay_content: data.essay_content || '',
         writer_resume: data.writer_resume || '',
@@ -135,7 +135,23 @@ export const PortfolioManager = () => {
         degree_level: data.degree_level || 'bachelors'
       });
 
-      toast.success("AI parsing complete! Review and edit the data below.");
+      // Fetch programmes if college was matched
+      if (data.college_id) {
+        fetchProgrammes(data.college_id);
+      }
+
+      // Show verification status
+      let message = "AI parsing complete! Review and edit the data below.";
+      if (data.search_used) {
+        message += " (AI verified names via web search)";
+      }
+      if (data.college_id && data.programme_id) {
+        message = "AI parsing complete! College and programme auto-matched in database.";
+      } else if (data.college_id) {
+        message = "AI parsing complete! College auto-matched. Programme not found in database.";
+      }
+      
+      toast.success(message);
     } catch (error: any) {
       console.error('Error parsing with AI:', error);
       toast.error(error.message || "Failed to parse with AI");

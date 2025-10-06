@@ -26,19 +26,25 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const systemPrompt = `You are an expert at analyzing winning college essays. Extract structured data from the provided documents.
+    const systemPrompt = `You are an expert at analyzing winning college essays with access to web search capabilities. Extract structured data from the provided documents.
 
 Your task:
 1. Identify the essay title (infer from content if not explicit)
-2. Extract college/university name
-3. Extract specific programme/major name
+2. Extract college/university name - USE YOUR WEB SEARCH to verify and find the official full name if needed
+3. Extract programme/major name - USE YOUR WEB SEARCH to verify this programme exists at the college
 4. Determine degree level (bachelors or masters)
 5. Summarize the writer's background from the resume
 6. Structure the questionnaire responses as key-value pairs
 7. Identify 3-5 key strategies that made this essay successful
 8. Suggest a performance score (0-100) based on quality
 
-Be precise and extract exact names for colleges and programmes.`;
+CRITICAL: For college and programme names:
+- If the name seems abbreviated or informal, search for the official full name
+- Verify the college exists and get its correct spelling
+- Verify the programme is actually offered at that college
+- Return standardized, official names that match institutional records
+
+Set the search_used flag to true if you used web search for verification.`;
 
     const userPrompt = `Essay Content:
 ${essayContent}
@@ -79,11 +85,11 @@ Extract and structure all relevant data from these documents.`;
                 },
                 college_name: {
                   type: 'string',
-                  description: 'Full official name of the target institution'
+                  description: 'Full official verified name of the target institution'
                 },
                 programme_name: {
                   type: 'string',
-                  description: 'Specific program or major name'
+                  description: 'Specific program or major name, verified'
                 },
                 degree_level: {
                   type: 'string',
@@ -109,9 +115,21 @@ Extract and structure all relevant data from these documents.`;
                   minimum: 0,
                   maximum: 100,
                   description: 'Quality assessment score'
+                },
+                search_used: {
+                  type: 'boolean',
+                  description: 'Whether web search was used to verify college/programme names'
+                },
+                college_name_verified: {
+                  type: 'boolean',
+                  description: 'Whether the college name was verified via web search'
+                },
+                programme_name_verified: {
+                  type: 'boolean',
+                  description: 'Whether the programme name was verified via web search'
                 }
               },
-              required: ['essay_title', 'essay_content', 'college_name', 'programme_name', 'degree_level', 'key_strategies', 'suggested_score']
+              required: ['essay_title', 'essay_content', 'college_name', 'programme_name', 'degree_level', 'key_strategies', 'suggested_score', 'search_used']
             }
           }
         }],
@@ -140,8 +158,65 @@ Extract and structure all relevant data from these documents.`;
 
     const extractedData = JSON.parse(toolCall.function.arguments);
 
+    // Now search our database for matching college and programme
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    let college_id: string | null = null;
+    let programme_id: string | null = null;
+    let college_matches: Array<{ id: string; name: string; country: string }> = [];
+    let programme_matches: Array<{ id: string; name: string; english_variant: string }> = [];
+
+    // Search for college by name (fuzzy match using ILIKE)
+    if (extractedData.college_name) {
+      const { data: colleges } = await supabaseClient
+        .from('colleges')
+        .select('id, name, country')
+        .ilike('name', `%${extractedData.college_name}%`)
+        .limit(5);
+      
+      if (colleges && colleges.length > 0) {
+        college_matches = colleges;
+        // Auto-select if exact match
+        const exactMatch = colleges.find(c => 
+          c.name.toLowerCase() === extractedData.college_name.toLowerCase()
+        );
+        college_id = exactMatch ? exactMatch.id : colleges[0].id;
+      }
+    }
+
+    // If college found, search for programme
+    if (college_id && extractedData.programme_name) {
+      const { data: programmes } = await supabaseClient
+        .from('programmes')
+        .select('id, name, english_variant')
+        .eq('college_id', college_id)
+        .ilike('name', `%${extractedData.programme_name}%`)
+        .limit(5);
+      
+      if (programmes && programmes.length > 0) {
+        programme_matches = programmes;
+        // Auto-select if exact match
+        const exactMatch = programmes.find(p => 
+          p.name.toLowerCase() === extractedData.programme_name.toLowerCase()
+        );
+        programme_id = exactMatch ? exactMatch.id : programmes[0].id;
+      }
+    }
+
+    const responseData = {
+      ...extractedData,
+      college_id,
+      programme_id,
+      college_matches,
+      programme_matches
+    };
+
     return new Response(
-      JSON.stringify(extractedData),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

@@ -237,25 +237,53 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
     content: string;
     collegeName?: string;
     programmeName?: string;
+    collegeId?: string;
+    programmeId?: string;
+    collegeMatches?: Array<{ id: string; name: string; country: string }>;
+    programmeMatches?: Array<{ id: string; name: string }>;
+    searchUsed?: boolean;
+    collegeNameVerified?: boolean;
+    programmeNameVerified?: boolean;
+    degreeLevel?: 'bachelors' | 'masters';
   }) => {
     setTitle(parsedData.title);
     setContent(parsedData.content);
     
-    // Auto-fill college if parsed
-    if (parsedData.collegeName) {
-      const matchedCollege = colleges.find(
-        (c) => c.name.toLowerCase().includes(parsedData.collegeName!.toLowerCase())
-      );
-      if (matchedCollege) {
-        setCollegeId(matchedCollege.id);
-      } else {
-        setIsCustomCollege(true);
-        setCustomCollegeName(parsedData.collegeName);
+    // Set degree level if parsed
+    if (parsedData.degreeLevel) {
+      setDegreeLevel(parsedData.degreeLevel);
+    }
+    
+    // Auto-fill college if database match found
+    if (parsedData.collegeId) {
+      setCollegeId(parsedData.collegeId);
+      setIsCustomCollege(false);
+      
+      // Show verification status
+      if (parsedData.searchUsed && parsedData.collegeNameVerified) {
+        toast.success(`College "${parsedData.collegeName}" verified and matched in database`);
+      } else if (parsedData.collegeMatches && parsedData.collegeMatches.length > 1) {
+        toast.info(`Found ${parsedData.collegeMatches.length} similar colleges. Top match selected.`);
+      }
+    } else if (parsedData.collegeName) {
+      // No database match, use custom entry
+      setIsCustomCollege(true);
+      setCustomCollegeName(parsedData.collegeName);
+      
+      if (parsedData.searchUsed && parsedData.collegeNameVerified) {
+        toast.info(`College "${parsedData.collegeName}" verified but not in database. Using custom entry.`);
       }
     }
 
-    // Auto-fill programme if parsed
-    if (parsedData.programmeName) {
+    // Auto-fill programme if database match found
+    if (parsedData.programmeId && parsedData.collegeId) {
+      setProgrammeId(parsedData.programmeId);
+      
+      if (parsedData.searchUsed && parsedData.programmeNameVerified) {
+        toast.success(`Programme "${parsedData.programmeName}" verified and matched`);
+      }
+    } else if (parsedData.programmeName) {
+      // No database match, use custom entry
       setCustomProgrammeName(parsedData.programmeName);
     }
 

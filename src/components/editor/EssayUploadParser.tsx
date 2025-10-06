@@ -16,6 +16,14 @@ interface ParsedEssayData {
   content: string;
   collegeName?: string;
   programmeName?: string;
+  collegeId?: string;
+  programmeId?: string;
+  collegeMatches?: Array<{ id: string; name: string; country: string }>;
+  programmeMatches?: Array<{ id: string; name: string }>;
+  searchUsed?: boolean;
+  collegeNameVerified?: boolean;
+  programmeNameVerified?: boolean;
+  degreeLevel?: 'bachelors' | 'masters';
 }
 
 interface EssayUploadParserProps {
@@ -97,14 +105,24 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
 
       // Parse the response
       const parsedData: ParsedEssayData = {
-        title: data.title || "",
-        content: extractedText,
-        collegeName: data.collegeName,
-        programmeName: data.programmeName,
+        title: data.essay_title || "",
+        content: data.essay_content || extractedText,
+        collegeName: data.college_name,
+        programmeName: data.programme_name,
+        collegeId: data.college_id,
+        programmeId: data.programme_id,
+        collegeMatches: data.college_matches || [],
+        programmeMatches: data.programme_matches || [],
+        searchUsed: data.search_used,
+        collegeNameVerified: data.college_name_verified,
+        programmeNameVerified: data.programme_name_verified,
+        degreeLevel: data.degree_level,
       };
 
       onParsed(parsedData);
-      toast.success("Essay parsed successfully!");
+      
+      const verifiedText = data.search_used ? " (AI verified via web search)" : "";
+      toast.success(`Essay parsed successfully!${verifiedText}`);
     } catch (error: any) {
       console.error("Parse error:", error);
       toast.error(error.message || "Failed to parse essay");
