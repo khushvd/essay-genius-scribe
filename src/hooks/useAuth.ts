@@ -16,23 +16,52 @@ export const useAuth = () => {
   const [role, setRole] = useState<'free' | 'premium' | 'admin' | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isFetchingProfile, setIsFetchingProfile] = useState(false);
 
   const fetchUserProfile = async (userId: string) => {
-    const profileResult = await profilesService.getProfile(userId);
+    // Prevent concurrent fetches
+    if (isFetchingProfile) return;
     
-    if (profileResult.success) {
+    setIsFetchingProfile(true);
+    
+    try {
+      const profileResult = await profilesService.getProfile(userId);
+      
+      if (!profileResult.success) {
+        throw new Error('Failed to fetch user profile');
+      }
+      
       setProfile(profileResult.data);
+
+      // Fetch user role
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (roleError) {
+        throw new Error('Failed to fetch user role');
+      }
+
+      setRole(roleData?.role || 'free');
+    } catch (error) {
+      console.error('Profile fetch error:', error);
+      toast.error('Failed to load your profile. Please sign in again.');
+      
+      // Sign out user if profile fetch fails
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (!signOutError) {
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        setRole(null);
+        setIsAuthenticated(false);
+      }
+    } finally {
+      setLoading(false);
+      setIsFetchingProfile(false);
     }
-
-    // Fetch user role
-    const { data: roleData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    setRole(roleData?.role || 'free');
-    setLoading(false);
   };
 
   useEffect(() => {

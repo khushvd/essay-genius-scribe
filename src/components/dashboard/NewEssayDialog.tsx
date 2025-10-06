@@ -70,6 +70,34 @@ interface NewEssayDialogProps {
 
 export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogProps) => {
   const navigate = useNavigate();
+  
+  // Helper function to sanitize text input
+  const sanitizeText = (text: string, maxLength: number): string => {
+    return text.trim().slice(0, maxLength);
+  };
+
+  // Helper function to verify college exists in database
+  const verifyCollegeExists = async (collegeId: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('colleges')
+      .select('id')
+      .eq('id', collegeId)
+      .maybeSingle();
+    
+    return !error && !!data;
+  };
+
+  // Helper function to verify programme exists in database
+  const verifyProgrammeExists = async (programmeId: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('programmes')
+      .select('id')
+      .eq('id', programmeId)
+      .maybeSingle();
+    
+    return !error && !!data;
+  };
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [degreeLevel, setDegreeLevel] = useState<"bachelors" | "masters">("bachelors");
@@ -263,7 +291,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
     }
   };
 
-  const handleParsedData = (parsedData: {
+  const handleParsedData = async (parsedData: {
     title: string;
     content: string;
     collegeName?: string;
@@ -277,45 +305,98 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
     programmeNameVerified?: boolean;
     degreeLevel?: 'bachelors' | 'masters';
   }) => {
-    setTitle(parsedData.title);
-    setContent(parsedData.content);
-    
+    // Validate title
+    const titleValidation = z.string().trim().min(1).max(200).safeParse(parsedData.title);
+    if (!titleValidation.success) {
+      toast.warning('Title is invalid or too long. Please edit manually.');
+    } else {
+      setTitle(sanitizeText(parsedData.title, 200));
+    }
+
+    // Validate content
+    const contentValidation = z.string().trim().min(50).max(50000).safeParse(parsedData.content);
+    if (!contentValidation.success) {
+      toast.warning('Essay content is invalid or exceeds length limits. Please edit manually.');
+    } else {
+      setContent(sanitizeText(parsedData.content, 50000));
+    }
+
     // Set degree level if parsed
-    if (parsedData.degreeLevel) {
+    if (parsedData.degreeLevel && ['bachelors', 'masters', 'phd'].includes(parsedData.degreeLevel)) {
       setDegreeLevel(parsedData.degreeLevel);
     }
-    
-    // Auto-fill college if database match found
+
+    // Validate and auto-fill college if database match found
     if (parsedData.collegeId) {
-      setCollegeId(parsedData.collegeId);
-      setIsCustomCollege(false);
+      const collegeExists = await verifyCollegeExists(parsedData.collegeId);
       
-      // Show verification status
-      if (parsedData.searchUsed && parsedData.collegeNameVerified) {
-        toast.success(`College "${parsedData.collegeName}" verified and matched in database`);
-      } else if (parsedData.collegeMatches && parsedData.collegeMatches.length > 1) {
-        toast.info(`Found ${parsedData.collegeMatches.length} similar colleges. Top match selected.`);
+      if (collegeExists) {
+        setCollegeId(parsedData.collegeId);
+        setIsCustomCollege(false);
+        
+        if (parsedData.searchUsed && parsedData.collegeNameVerified) {
+          toast.success(`College "${parsedData.collegeName}" verified and matched in database`);
+        } else if (parsedData.collegeMatches && parsedData.collegeMatches.length > 1) {
+          toast.info(`Found ${parsedData.collegeMatches.length} similar colleges. Top match selected.`);
+        }
+      } else {
+        // College ID doesn't exist in database
+        toast.warning('Parsed college not found in database. Please select manually.');
+        
+        // Try custom name instead
+        if (parsedData.collegeName) {
+          const sanitizedName = sanitizeText(parsedData.collegeName, 200);
+          if (sanitizedName) {
+            setIsCustomCollege(true);
+            setCustomCollegeName(sanitizedName);
+          }
+        }
       }
     } else if (parsedData.collegeName) {
       // No database match, use custom entry
-      setIsCustomCollege(true);
-      setCustomCollegeName(parsedData.collegeName);
-      
-      if (parsedData.searchUsed && parsedData.collegeNameVerified) {
-        toast.info(`College "${parsedData.collegeName}" verified but not in database. Using custom entry.`);
+      const sanitizedName = sanitizeText(parsedData.collegeName, 200);
+      if (sanitizedName) {
+        setIsCustomCollege(true);
+        setCustomCollegeName(sanitizedName);
+        
+        if (parsedData.searchUsed && parsedData.collegeNameVerified) {
+          toast.info(`College "${sanitizedName}" verified but not in database. Using custom entry.`);
+        }
+      } else {
+        toast.warning('College name is too long or invalid. Please enter manually.');
       }
     }
 
-    // Auto-fill programme if database match found
+    // Validate and auto-fill programme if database match found
     if (parsedData.programmeId && parsedData.collegeId) {
-      setProgrammeId(parsedData.programmeId);
+      const programmeExists = await verifyProgrammeExists(parsedData.programmeId);
       
-      if (parsedData.searchUsed && parsedData.programmeNameVerified) {
-        toast.success(`Programme "${parsedData.programmeName}" verified and matched`);
+      if (programmeExists) {
+        setProgrammeId(parsedData.programmeId);
+        
+        if (parsedData.searchUsed && parsedData.programmeNameVerified) {
+          toast.success(`Programme "${parsedData.programmeName}" verified and matched`);
+        }
+      } else {
+        // Programme ID doesn't exist in database
+        toast.warning('Parsed programme not found in database. Please select manually.');
+        
+        // Try custom name instead
+        if (parsedData.programmeName) {
+          const sanitizedName = sanitizeText(parsedData.programmeName, 200);
+          if (sanitizedName) {
+            setCustomProgrammeName(sanitizedName);
+          }
+        }
       }
     } else if (parsedData.programmeName) {
       // No database match, use custom entry
-      setCustomProgrammeName(parsedData.programmeName);
+      const sanitizedName = sanitizeText(parsedData.programmeName, 200);
+      if (sanitizedName) {
+        setCustomProgrammeName(sanitizedName);
+      } else {
+        toast.warning('Programme name is too long or invalid. Please enter manually.');
+      }
     }
 
     // Switch to manual mode to allow editing
