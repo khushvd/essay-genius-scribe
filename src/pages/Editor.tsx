@@ -60,26 +60,40 @@ const Editor = () => {
 
     try {
       const session = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke('export-essay-docx', {
-        body: { essayId: essay.id },
-        headers: {
-          Authorization: `Bearer ${session.data.session?.access_token}`,
-        },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-essay-docx`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.data.session?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ essayId: essay.id }),
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
 
-      const blob = new Blob([data.content], { type: 'text/plain' });
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${essay.title || 'essay'}.txt`;
+      
+      // Generate filename: college_programme_title.rtf
+      const collegeName = essay.colleges?.name || essay.custom_college_name || 'essay';
+      const programmeName = essay.programmes?.name || essay.custom_programme_name || '';
+      const title = essay.title || 'essay';
+      const filename = `${collegeName}_${programmeName}_${title}`.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+      
+      a.download = `${filename}.rtf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success('Essay exported successfully');
+      toast.success('Essay exported as RTF (opens in Word)');
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Failed to export essay');

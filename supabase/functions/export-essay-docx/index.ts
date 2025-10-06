@@ -48,21 +48,27 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Essay not found or access denied");
     }
 
-    // Create plain text content formatted for Word
-    const textContent = [
-      essay.title || "Untitled Essay",
-      "",
-      "=" .repeat((essay.title || "Untitled Essay").length),
-      "",
-      essay.content,
-    ].join("\n");
+    // For now, return rich text format (RTF) which Word can open
+    // RTF is simpler than generating proper DOCX and doesn't require external libraries
+    const title = essay.title || "Untitled Essay";
+    const content = essay.content.replace(/\n/g, "\\par\n");
+    
+    const rtfContent = `{\\rtf1\\ansi\\deff0
+{\\fonttbl{\\f0\\fswiss Helvetica;}{\\f1\\froman Times New Roman;}}
+{\\colortbl;\\red0\\green0\\blue0;\\red0\\green0\\blue255;}
+\\f1\\fs24
+{\\b\\fs32 ${title}\\par}
+\\par
+${content}
+\\par
+}`;
 
-    return new Response(textContent, {
+    return new Response(rtfContent, {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": "application/msword",
-        "Content-Disposition": `attachment; filename="${essay.title || "essay"}.doc"`,
+        "Content-Type": "application/rtf",
+        "Content-Disposition": `attachment; filename="${essay.title || "essay"}.rtf"`,
       },
     });
   } catch (error: any) {

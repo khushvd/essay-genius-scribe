@@ -74,11 +74,12 @@ serve(async (req) => {
   console.log(`[${requestId}] ========== NEW ANALYSIS REQUEST ==========`);
 
   try {
-    const { essayId, content, cvData } = await req.json();
+    const { essayId, content, cvData, mode = 'both' } = await req.json();
     console.log(`[${requestId}] Request params:`, { 
       essayId, 
       contentLength: content?.length, 
-      hasCvData: !!cvData 
+      hasCvData: !!cvData,
+      mode
     });
 
     if (!content) {
@@ -176,6 +177,128 @@ serve(async (req) => {
       collegeName: essayData?.colleges?.name || customCollegeName,
       programmeName: essayData?.programmes?.name || customProgrammeName
     });
+
+    // Handle score-only mode
+    if (mode === 'score') {
+      console.log(`[${requestId}] Score-only mode - generating score only`);
+      
+      const scoringPrompt = `Based on this essay, provide detailed scores:
+
+Essay Content:
+${content}
+
+Score the essay on these dimensions (0-100 each):
+1. Overall Quality - holistic assessment
+2. Clarity - clear communication and structure
+3. Impact - emotional resonance and memorability
+4. Authenticity - genuine voice and personal insight
+5. Coherence - logical flow and connection between ideas
+
+Provide brief reasoning for the overall score.`;
+
+      try {
+        // Use the same model selection logic as feedback
+        const modelUsed = collegeTier === 'premium' ? 'claude' : 'gemini';
+        console.log(`[${requestId}] Using ${modelUsed} for scoring`);
+
+        let scoreResponse;
+        if (modelUsed === 'claude') {
+          scoreResponse = await callClaudeAPI('You are an expert essay scorer.', scoringPrompt, [{
+            type: 'function',
+            function: {
+              name: 'score_essay',
+              description: 'Provide numerical scores for the essay',
+              parameters: {
+                type: 'object',
+                properties: {
+                  overall_score: { type: 'number', minimum: 0, maximum: 100 },
+                  clarity_score: { type: 'number', minimum: 0, maximum: 100 },
+                  impact_score: { type: 'number', minimum: 0, maximum: 100 },
+                  authenticity_score: { type: 'number', minimum: 0, maximum: 100 },
+                  coherence_score: { type: 'number', minimum: 0, maximum: 100 },
+                  reasoning: { type: 'string' }
+                },
+                required: ['overall_score', 'clarity_score', 'impact_score', 'authenticity_score', 'coherence_score', 'reasoning']
+              }
+            }
+          }]);
+        } else {
+          scoreResponse = await callGeminiAPI('You are an expert essay scorer.', scoringPrompt, [{
+            type: 'function',
+            function: {
+              name: 'score_essay',
+              description: 'Provide numerical scores for the essay',
+              parameters: {
+                type: 'object',
+                properties: {
+                  overall_score: { type: 'number', minimum: 0, maximum: 100 },
+                  clarity_score: { type: 'number', minimum: 0, maximum: 100 },
+                  impact_score: { type: 'number', minimum: 0, maximum: 100 },
+                  authenticity_score: { type: 'number', minimum: 0, maximum: 100 },
+                  coherence_score: { type: 'number', minimum: 0, maximum: 100 },
+                  reasoning: { type: 'string' }
+                },
+                required: ['overall_score', 'clarity_score', 'impact_score', 'authenticity_score', 'coherence_score', 'reasoning']
+              }
+            }
+          }]);
+        }
+
+        if (!scoreResponse.ok) {
+          throw new Error(`Score API error: ${scoreResponse.status}`);
+        }
+
+        const scoreData = await scoreResponse.json();
+        let essayScores: any;
+
+        if (modelUsed === 'claude') {
+          const scoreToolUse = scoreData.content?.find((item: any) => item.type === 'tool_use' && item.name === 'score_essay');
+          essayScores = scoreToolUse?.input;
+        } else {
+          const scoreToolCall = scoreData.choices?.[0]?.message?.tool_calls?.find((tc: any) => tc.function.name === 'score_essay');
+          if (scoreToolCall) {
+            essayScores = JSON.parse(scoreToolCall.function.arguments);
+          }
+        }
+
+        if (essayScores) {
+          const { error: scoreError } = await supabase
+            .from('essay_scores')
+            .insert({
+              essay_id: essayId,
+              score_type: 'initial',
+              overall_score: Math.round(essayScores.overall_score),
+              clarity_score: Math.round(essayScores.clarity_score),
+              impact_score: Math.round(essayScores.impact_score),
+              authenticity_score: Math.round(essayScores.authenticity_score),
+              coherence_score: Math.round(essayScores.coherence_score),
+              ai_reasoning: essayScores.reasoning,
+              scored_by: user.id
+            });
+
+          if (scoreError) {
+            console.error(`[${requestId}] Error storing scores:`, scoreError);
+            throw new Error('Failed to store essay scores');
+          }
+
+          console.log(`[${requestId}] Score generated and stored successfully`);
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            mode: 'score'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (scoreError) {
+        console.error(`[${requestId}] Error in score generation:`, scoreError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate score' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     // Fetch successful essays only if college and programme are provided
     let ragContext = 'No specific college/programme context provided. Providing general editorial guidance based on best practices for college essays.';
@@ -529,6 +652,7 @@ Provide detailed reasoning for each score.`;
       JSON.stringify({ 
         suggestions: suggestionsWithIds,
         analysisId,
+        mode,
         metadata: {
           model: modelUsed,
           collegeTier

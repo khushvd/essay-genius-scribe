@@ -159,6 +159,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
       // Validate file
       fileValidationSchema.parse({ size: file.size, type: file.type });
       
+      setLoading(true);
       const fileType = file.type;
       let extractedText = "";
 
@@ -182,7 +183,35 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
 
       setCvText(extractedText);
       setResumeFile(file);
-      toast.success("Resume uploaded successfully!");
+
+      // Call AI to parse resume and auto-fill questionnaire
+      if (extractedText.trim().length >= 50) {
+        toast.info("Parsing resume with AI...");
+        
+        const { data, error } = await supabase.functions.invoke('parse-resume', {
+          body: { resumeText: extractedText },
+        });
+
+        if (error) {
+          console.error("AI parsing error:", error);
+          toast.success("Resume uploaded! You can manually fill in the questionnaire below.");
+        } else if (data?.parsed_data) {
+          const parsed = data.parsed_data;
+          
+          // Auto-populate questionnaire from parsed resume
+          setQuestionnaireData({
+            academicInterests: parsed.academic_interests?.join(", ") || "",
+            extracurriculars: parsed.extracurriculars?.join(", ") || "",
+            careerGoals: parsed.career_goals || "",
+            challenges: "", // Not extracted from resume
+          });
+
+          toast.success("Resume uploaded and parsed! Questionnaire auto-filled.");
+          setQuestionnaireOpen(true); // Show questionnaire so user can review
+        }
+      } else {
+        toast.success("Resume uploaded successfully!");
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -190,6 +219,8 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
         console.error("Resume parsing error:", error);
         toast.error("Failed to parse resume. Please try pasting the text instead.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 

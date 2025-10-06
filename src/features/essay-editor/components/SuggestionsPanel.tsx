@@ -28,7 +28,14 @@ export const SuggestionsPanel = ({
 }: SuggestionsPanelProps) => {
   return (
     <div className="space-y-4">
-      <EssayScoreCard essayId={essayId} />
+      <EssayScoreCard 
+        essayId={essayId}
+        content={content}
+        collegeId={collegeId}
+        programmeId={programmeId}
+        cvData={cvData}
+        englishVariant={englishVariant}
+      />
       <EditorSuggestions
         essayId={essayId}
         content={content}

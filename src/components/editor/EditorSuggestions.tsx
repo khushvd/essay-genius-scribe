@@ -49,13 +49,21 @@ const EditorSuggestions = ({
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [analysisId, setAnalysisId] = useState<string>("");
+  const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
 
-  // Auto-analyze on mount if content exists
+  // Auto-analyze with delay and retry logic
   useEffect(() => {
-    if (content.trim() && content.length >= 50 && !hasAnalyzed) {
-      handleAnalyze();
+    if (!essayId || !content.trim() || content.length < 50 || hasAnalyzed) {
+      return;
     }
-  }, []); // Only run on mount
+
+    // Add 2-second delay to ensure essay data is loaded
+    const timer = setTimeout(() => {
+      handleAnalyze();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [essayId, content, hasAnalyzed]);
 
   const handleAnalyze = async () => {
     if (!content.trim()) {
@@ -63,9 +71,17 @@ const EditorSuggestions = ({
       return;
     }
 
+    // Prevent multiple requests within 10 seconds
+    const now = Date.now();
+    if (now - lastAnalysisTime < 10000) {
+      toast.error("Analysis in progress. Please wait a moment.");
+      return;
+    }
+
     setAnalyzing(true);
     setSuggestions([]);
     setAppliedSuggestions(new Set());
+    setLastAnalysisTime(now);
 
     try {
       const { data, error } = await supabase.functions.invoke('analyze-essay', {
@@ -76,11 +92,15 @@ const EditorSuggestions = ({
           programmeId,
           cvData,
           englishVariant,
+          mode: 'feedback', // Only get feedback, not score
         },
       });
 
       if (error) {
-        if (error.message.includes('Rate limit')) {
+        if (error.message.includes('Essay not found')) {
+          toast.error("Essay not found. Redirecting to dashboard...");
+          setTimeout(() => window.location.href = '/dashboard', 2000);
+        } else if (error.message.includes('Rate limit')) {
           toast.error("Too many requests. Please wait a moment and try again.");
         } else if (error.message.includes('credits')) {
           toast.error("Editorial feedback requires additional credits.");
@@ -185,7 +205,7 @@ const EditorSuggestions = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Analyzing your essay...</span>
+                <span>Analyzing with AI...</span>
               </div>
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-24 w-full" />

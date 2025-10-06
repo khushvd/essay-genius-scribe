@@ -3,16 +3,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, Award } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, Award, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface EssayScoreCardProps {
   essayId: string;
+  content: string;
+  collegeId: string | null;
+  programmeId: string | null;
+  cvData: any;
+  englishVariant: 'american' | 'british';
   onScoreUpdate?: () => void;
 }
 
-export const EssayScoreCard = ({ essayId, onScoreUpdate }: EssayScoreCardProps) => {
+export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvData, englishVariant, onScoreUpdate }: EssayScoreCardProps) => {
   const [latestScore, setLatestScore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   const fetchLatestScore = async () => {
     const { data, error } = await supabase
@@ -55,6 +63,42 @@ export const EssayScoreCard = ({ essayId, onScoreUpdate }: EssayScoreCardProps) 
     };
   }, [essayId]);
 
+  const handleGenerateScore = async () => {
+    if (!content.trim() || content.length < 50) {
+      toast.error("Write at least 50 characters to get a score");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-essay', {
+        body: {
+          essayId,
+          content,
+          collegeId,
+          programmeId,
+          cvData,
+          englishVariant,
+          mode: 'score', // Only generate score
+        },
+      });
+
+      if (error) {
+        toast.error("Failed to generate score. Please try again.");
+        console.error('Score generation error:', error);
+        return;
+      }
+
+      toast.success("Score generated successfully!");
+      // Score will be automatically updated via realtime subscription
+    } catch (err) {
+      console.error('Error generating score:', err);
+      toast.error("Failed to generate score. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-green-600 dark:text-green-400";
     if (score >= 60) return "text-yellow-600 dark:text-yellow-400";
@@ -89,10 +133,25 @@ export const EssayScoreCard = ({ essayId, onScoreUpdate }: EssayScoreCardProps) 
             Essay Score
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Request feedback to get your essay scored
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground text-center py-2">
+            Generate an AI score for your essay
           </p>
+          <Button 
+            onClick={handleGenerateScore} 
+            disabled={generating || content.length < 50}
+            className="w-full"
+            size="sm"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              'Generate Score'
+            )}
+          </Button>
         </CardContent>
       </Card>
     );
@@ -106,9 +165,19 @@ export const EssayScoreCard = ({ essayId, onScoreUpdate }: EssayScoreCardProps) 
             <Award className="w-4 h-4" />
             Essay Score
           </CardTitle>
-          <Badge variant={getScoreBadgeVariant(latestScore.overall_score || 0)}>
-            {latestScore.score_type === 'initial' ? 'Initial' : 'After Edits'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={getScoreBadgeVariant(latestScore.overall_score || 0)}>
+              {latestScore.score_type === 'initial' ? 'Initial' : 'After Edits'}
+            </Badge>
+            <Button 
+              onClick={handleGenerateScore} 
+              disabled={generating}
+              variant="ghost"
+              size="sm"
+            >
+              {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Re-score'}
+            </Button>
+          </div>
         </div>
         <CardDescription className="text-xs">
           Last scored {new Date(latestScore.scored_at).toLocaleDateString()}
