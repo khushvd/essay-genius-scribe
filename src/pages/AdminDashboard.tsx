@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogOut } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 import { EssaysOverview } from "@/components/admin/EssaysOverview";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { PortfolioManager } from "@/components/admin/PortfolioManager";
@@ -17,11 +16,7 @@ interface AdminDashboardProps {
 
 const AdminDashboard = ({ user, profile }: AdminDashboardProps) => {
   const [activeTab, setActiveTab] = useState("essays");
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-  };
+  const { signOut: handleSignOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-subtle">

@@ -1,32 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { PenLine } from "lucide-react";
-import { z } from "zod";
-
-// Validation schemas
-const authValidationSchema = z.object({
-  email: z.string()
-    .trim()
-    .email("Invalid email address")
-    .max(255, "Email must be less than 255 characters"),
-  password: z.string()
-    .min(10, "Password must be at least 10 characters")
-    .max(100, "Password must be less than 100 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
-  fullName: z.string()
-    .trim()
-    .min(1, "Full name is required")
-    .max(100, "Full name must be less than 100 characters")
-    .optional(),
-});
+import { authService } from "@/services/auth.service";
+import { profilesService } from "@/services/profiles.service";
+import { authValidationSchema } from "@/lib/validation/schemas";
 
 export const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -46,77 +27,52 @@ export const AuthForm = () => {
         ? { email, password }
         : { email, password, fullName };
       
-      const validationResult = authValidationSchema.safeParse(validationData);
-      
-      if (!validationResult.success) {
-        toast.error(validationResult.error.errors[0].message);
+      const parsed = authValidationSchema.safeParse(validationData);
+      if (!parsed.success) {
+        toast.error(parsed.error.errors[0].message);
         setLoading(false);
         return;
       }
 
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        
-        if (error) throw error;
-
-        // Check account status after login
-        if (data.user) {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('account_status')
-            .eq('id', data.user.id)
-            .single();
-
-          if (profileError) {
-            console.error('Error fetching profile:', profileError);
-            toast.error('Unable to verify account status');
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
-          }
-
-          // Handle different account statuses
-          if (profile.account_status === 'pending') {
-            toast.info('Your account is pending approval');
-            navigate("/pending-approval");
-            setLoading(false);
-            return;
-          } else if (profile.account_status === 'rejected') {
-            toast.error('Your account has been rejected. Please contact support.');
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
-          } else if (profile.account_status === 'suspended') {
-            toast.error('Your account has been suspended. Please contact support.');
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
-          }
+        const result = await authService.signIn({ email, password });
+        if (!result.success) {
+          toast.error(result.error.message);
+          setLoading(false);
+          return;
         }
-        
-        toast.success("Welcome back!");
-        navigate("/dashboard");
+
+        const profileResult = await profilesService.getProfile(result.data.user.id);
+        if (!profileResult.success) {
+          toast.error('Unable to verify account status');
+          await authService.signOut();
+          setLoading(false);
+          return;
+        }
+
+        const { account_status } = profileResult.data;
+        if (account_status === 'pending') {
+          toast.info('Your account is pending approval');
+          navigate("/pending-approval");
+        } else if (account_status === 'rejected' || account_status === 'suspended') {
+          toast.error(`Your account has been ${account_status}. Please contact support.`);
+          await authService.signOut();
+        } else {
+          toast.success("Welcome back!");
+          navigate("/dashboard");
+        }
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-          },
-        });
-        
-        if (error) throw error;
+        const result = await authService.signUp({ email, password, fullName: fullName || '' });
+        if (!result.success) {
+          toast.error(result.error.message);
+          setLoading(false);
+          return;
+        }
         toast.success("Account created successfully! Awaiting approval.");
         navigate("/pending-approval");
       }
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -135,67 +91,26 @@ export const AuthForm = () => {
 
         <div className="bg-card rounded-2xl shadow-soft border border-border p-8">
           <div className="flex gap-2 mb-6">
-            <Button
-              variant={isLogin ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => setIsLogin(true)}
-            >
-              Sign In
-            </Button>
-            <Button
-              variant={!isLogin ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => setIsLogin(false)}
-            >
-              Sign Up
-            </Button>
+            <Button variant={isLogin ? "default" : "outline"} className="flex-1" onClick={() => setIsLogin(true)}>Sign In</Button>
+            <Button variant={!isLogin ? "default" : "outline"} className="flex-1" onClick={() => setIsLogin(false)}>Sign Up</Button>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required={!isLogin}
-                  placeholder="John Doe"
-                />
+                <Input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required={!isLogin} placeholder="John Doe" />
               </div>
             )}
-            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="you@example.com"
-              />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                minLength={6}
-              />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={6} />
             </div>
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
             </Button>
           </form>

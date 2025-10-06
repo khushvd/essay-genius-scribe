@@ -1,72 +1,33 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { LogOut, Plus, FileText } from "lucide-react";
 import { EssayList } from "@/components/dashboard/EssayList";
 import { NewEssayDialog } from "@/components/dashboard/NewEssayDialog";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 import AdminDashboard from "./AdminDashboard";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [showNewEssay, setShowNewEssay] = useState(false);
-  const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
+  const { user, profile, loading, isAdmin, signOut, checkAccountStatus } = useAuth();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
+    if (!loading) {
+      if (!user) {
         navigate("/auth");
         return;
       }
 
-      setUser(session.user);
-      
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
-      
-      setProfile(profileData);
-      
-      // Check account status
-      if (profileData?.account_status === "pending") {
-        navigate("/pending-approval");
-        return;
-      } else if (profileData?.account_status === "rejected" || profileData?.account_status === "suspended") {
-        await supabase.auth.signOut();
-        toast.error(`Your account has been ${profileData.account_status}`);
+      const status = checkAccountStatus();
+      if (status === 'rejected' || status === 'suspended') {
         navigate("/auth");
         return;
       }
-      
-      setLoading(false);
-    };
+    }
+  }, [user, loading, navigate, checkAccountStatus]);
 
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") {
-        navigate("/auth");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
-  };
-
-  if (loading || roleLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
@@ -78,7 +39,7 @@ const Dashboard = () => {
   }
 
   // Redirect admins to admin dashboard
-  if (isAdmin) {
+  if (isAdmin && user && profile) {
     return <AdminDashboard user={user} profile={profile} />;
   }
 
@@ -100,7 +61,7 @@ const Dashboard = () => {
               <p className="text-sm font-medium">{profile?.full_name}</p>
               <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleSignOut}>
+            <Button variant="outline" size="sm" onClick={signOut}>
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
