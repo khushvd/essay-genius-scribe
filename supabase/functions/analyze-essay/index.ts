@@ -322,7 +322,7 @@ Provide brief reasoning for the overall score.`;
       if (successfulEssays && successfulEssays.length > 0) {
         ragContext = successfulEssays.map((essay, idx) => `
 Example Essay ${idx + 1} (Score: ${essay.performance_score}/100)${essay.essay_title ? ` - "${essay.essay_title}"` : ''}${essay.degree_level ? ` [${essay.degree_level}]` : ''}:
-${essay.essay_content.substring(0, 500)}...
+${essay.essay_content.substring(0, 5000)}...
 
 ${essay.writer_resume ? `Writer's Background:\n${essay.writer_resume.substring(0, 300)}...\n` : ''}
 ${essay.writer_questionnaire ? `Writer's Profile:\n${JSON.stringify(essay.writer_questionnaire, null, 2)}\n` : ''}
@@ -583,6 +583,52 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
       };
     });
 
+    // Validate suggestion positions
+    const validateSuggestion = (s: any, essayContent: string): boolean => {
+      const { location, originalText } = s;
+      const { start, end } = location;
+
+      // Check positions are within bounds
+      if (start < 0 || end > essayContent.length) {
+        console.warn(`[${requestId}] Invalid suggestion position: start=${start}, end=${end}, length=${essayContent.length}`);
+        return false;
+      }
+
+      // Check start < end
+      if (start >= end) {
+        console.warn(`[${requestId}] Invalid suggestion range: start=${start} >= end=${end}`);
+        return false;
+      }
+
+      // Verify originalText matches actual content
+      const actualText = essayContent.substring(start, end);
+      if (actualText !== originalText) {
+        console.warn(`[${requestId}] Text mismatch at ${start}-${end}. Expected: "${originalText}", Found: "${actualText}"`);
+        return false;
+      }
+
+      return true;
+    };
+
+    const validatedSuggestions = suggestionsWithIds.filter((s: any) => validateSuggestion(s, content));
+    console.log(`[${requestId}] Filtered ${suggestionsWithIds.length - validatedSuggestions.length} invalid suggestions`);
+
+    // Deduplicate suggestions by location
+    const seenLocations = new Set<string>();
+    const deduplicatedSuggestions = validatedSuggestions.filter((s: any) => {
+      const locationKey = `${s.location.start}-${s.location.end}`;
+      
+      if (seenLocations.has(locationKey)) {
+        console.log(`[${requestId}] Skipping duplicate suggestion at ${locationKey}`);
+        return false;
+      }
+      
+      seenLocations.add(locationKey);
+      return true;
+    });
+
+    console.log(`[${requestId}] Removed ${validatedSuggestions.length - deduplicatedSuggestions.length} duplicate suggestions`);
+
     // Generate essay score using second AI call
     const scorePrompt = `Based on the essay analysis, provide detailed quality scores.
 
@@ -646,16 +692,21 @@ Provide detailed reasoning for each score.`;
       // Don't fail the entire request if scoring fails
     }
 
-    console.log(`[${requestId}] Analysis complete. Returning ${suggestionsWithIds.length} suggestions`);
+    console.log(`[${requestId}] Analysis complete. Returning ${deduplicatedSuggestions.length} suggestions`);
 
     return new Response(
       JSON.stringify({ 
-        suggestions: suggestionsWithIds,
+        suggestions: deduplicatedSuggestions,
         analysisId,
         mode,
         metadata: {
           model: modelUsed,
-          collegeTier
+          collegeTier,
+          validationStats: {
+            original: suggestionsWithIds.length,
+            afterValidation: validatedSuggestions.length,
+            afterDeduplication: deduplicatedSuggestions.length
+          }
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
