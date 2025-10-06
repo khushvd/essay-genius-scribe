@@ -24,7 +24,13 @@ async function callClaudeAPI(systemPrompt: string, userPrompt: string, tools: an
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
-      system: systemPrompt,
+      system: [
+        {
+          type: "text",
+          text: systemPrompt,
+          cache_control: { type: "ephemeral" }
+        }
+      ],
       messages: [{ role: 'user', content: userPrompt }],
       tools: tools.map(t => ({
         name: t.function.name,
@@ -499,7 +505,7 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
 
     let aiResponse;
     let usingFallback = false;
-    let modelUsed = useClaude ? 'claude-sonnet-4' : 'gemini-2.5-flash';
+    let modelUsed: string;
 
     try {
       if (useClaude) {
@@ -511,9 +517,12 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
           usingFallback = true;
           modelUsed = 'gemini-2.5-flash (fallback)';
           aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+        } else {
+          modelUsed = 'claude-sonnet-4';
         }
       } else {
         aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+        modelUsed = 'gemini-2.5-flash';
       }
     } catch (error) {
       console.error(`[${requestId}] Primary AI call failed, attempting fallback:`, error);
@@ -574,6 +583,8 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
       cleanSuggestion = cleanSuggestion
         .replace(/^["']|["']$/g, '') // Remove leading/trailing quotes
         .replace(/^(Replace with:|Change to:|Use instead:|Rewrite as:)\s*/i, '') // Remove common prefixes
+        .replace(/—/g, '-') // Replace em dash
+        .replace(/–/g, '-') // Replace en dash
         .trim();
 
       return {
