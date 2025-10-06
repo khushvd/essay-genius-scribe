@@ -25,7 +25,11 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/editor/:id" element={<Editor />} />
+            <Route path="/editor/:id" element={
+              <ErrorBoundary>
+                <Editor />
+              </ErrorBoundary>
+            } />
             <Route path="/pending-approval" element={<PendingApproval />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<NotFound />} />

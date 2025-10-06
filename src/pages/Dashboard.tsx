@@ -13,17 +13,19 @@ const Dashboard = () => {
   const { user, profile, loading, isAdmin, signOut, checkAccountStatus } = useAuth();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const status = checkAccountStatus();
-      if (status === 'rejected' || status === 'suspended') {
-        navigate("/auth");
-        return;
-      }
+    // Early return if still loading
+    if (loading) return;
+    
+    // Check authentication
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+    
+    // Check account status
+    const status = checkAccountStatus();
+    if (status === 'rejected' || status === 'suspended') {
+      navigate("/auth");
     }
   }, [user, loading, navigate, checkAccountStatus]);
 

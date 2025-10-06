@@ -3,38 +3,49 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, LogOut } from "lucide-react";
+import { AlertCircle, LogOut, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const PendingApproval = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState<string>("");
+  const [checking, setChecking] = useState(false);
+
+  const checkStatus = async (manual = false) => {
+    if (manual) {
+      setChecking(true);
+      toast.info("Checking status...");
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+
+    setEmail(user.email || "");
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("account_status")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.account_status === "approved") {
+      if (manual) toast.success("Account approved! Redirecting...");
+      navigate("/dashboard");
+    } else if (profile?.account_status === "rejected") {
+      toast.error("Your account has been rejected");
+    } else if (profile?.account_status === "suspended") {
+      toast.error("Your account has been suspended");
+    } else if (manual) {
+      toast.info("Still pending approval");
+    }
+
+    if (manual) setChecking(false);
+  };
 
   useEffect(() => {
-    const checkStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      setEmail(user.email || "");
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("account_status")
-        .eq("id", user.id)
-        .single();
-
-      if (profile?.account_status === "approved") {
-        navigate("/dashboard");
-      } else if (profile?.account_status === "rejected") {
-        toast.error("Your account has been rejected");
-      } else if (profile?.account_status === "suspended") {
-        toast.error("Your account has been suspended");
-      }
-    };
-
     checkStatus();
 
     const channel = supabase
@@ -92,14 +103,26 @@ const PendingApproval = () => {
             </div>
           </div>
 
-          <Button 
-            onClick={handleSignOut} 
-            variant="outline" 
-            className="w-full"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="space-y-2">
+            <Button 
+              onClick={() => checkStatus(true)} 
+              variant="default" 
+              className="w-full"
+              disabled={checking}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+              Check Status
+            </Button>
+            
+            <Button 
+              onClick={handleSignOut} 
+              variant="outline" 
+              className="w-full"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

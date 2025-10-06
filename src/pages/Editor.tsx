@@ -56,6 +56,10 @@ const Editor = () => {
     applySuggestion(suggestion, content, setContent);
   };
 
+  const sanitizeFilename = (value: string | null | undefined): string => {
+    return value?.trim() || 'unnamed';
+  };
+
   const handleExportAsWord = async () => {
     if (!essay) return;
 
@@ -80,9 +84,9 @@ const Editor = () => {
       a.href = url;
 
       // Generate filename: college_programme_title.rtf
-      const collegeName = essay.colleges?.name || essay.custom_college_name || "essay";
-      const programmeName = essay.programmes?.name || essay.custom_programme_name || "";
-      const title = essay.title || "essay";
+      const collegeName = sanitizeFilename(essay.colleges?.name || essay.custom_college_name);
+      const programmeName = sanitizeFilename(essay.programmes?.name || essay.custom_programme_name);
+      const title = sanitizeFilename(essay.title);
       const filename = `${collegeName}_${programmeName}_${title}`.replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
 
       a.download = `${filename}.rtf`;

@@ -62,10 +62,10 @@ export class ErrorBoundary extends Component<Props, State> {
                   Try Again
                 </Button>
                 <Button 
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => window.location.href = '/dashboard'}
                   className="flex-1"
                 >
-                  Go Home
+                  Go to Dashboard
                 </Button>
               </div>
             </CardContent>
