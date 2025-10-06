@@ -1,0 +1,185 @@
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Upload, Loader2, FileText, X } from "lucide-react";
+import mammoth from "mammoth";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+interface ParsedEssayData {
+  title: string;
+  content: string;
+  collegeName?: string;
+  programmeName?: string;
+}
+
+interface EssayUploadParserProps {
+  onParsed: (data: ParsedEssayData) => void;
+}
+
+export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState(false);
+
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    const fileType = file.type;
+    let extractedText = "";
+
+    if (fileType === "application/pdf") {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        extractedText += pageText + "\n";
+      }
+    } else if (
+      fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      fileType === "application/msword"
+    ) {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      extractedText = result.value;
+    } else {
+      throw new Error("Unsupported file type. Please use PDF or DOCX.");
+    }
+
+    return extractedText;
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        toast.error("File size must be less than 5MB");
+        return;
+      }
+      setFile(selectedFile);
+    }
+  };
+
+  const handleParse = async () => {
+    if (!file) {
+      toast.error("Please select a file first");
+      return;
+    }
+
+    setParsing(true);
+    try {
+      // Extract text from file
+      const extractedText = await extractTextFromFile(file);
+
+      if (!extractedText.trim()) {
+        toast.error("Could not extract text from file");
+        setParsing(false);
+        return;
+      }
+
+      // Call edge function to parse with AI
+      const { data, error } = await supabase.functions.invoke("parse-portfolio-essay", {
+        body: { essayContent: extractedText },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        toast.error(data.error);
+        setParsing(false);
+        return;
+      }
+
+      // Parse the response
+      const parsedData: ParsedEssayData = {
+        title: data.title || "",
+        content: extractedText,
+        collegeName: data.collegeName,
+        programmeName: data.programmeName,
+      };
+
+      onParsed(parsedData);
+      toast.success("Essay parsed successfully!");
+    } catch (error: any) {
+      console.error("Parse error:", error);
+      toast.error(error.message || "Failed to parse essay");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="essay-upload" className="text-base font-medium">
+          Upload Essay Document
+        </Label>
+        <p className="text-sm text-muted-foreground mb-3">
+          Upload your essay (PDF or DOCX) and AI will automatically extract the content and metadata
+        </p>
+
+        {file ? (
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+            <FileText className="h-5 w-5" />
+            <span className="text-sm flex-1">{file.name}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setFile(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <Label htmlFor="essay-upload" className="cursor-pointer">
+              <div className="border-2 border-dashed rounded-md p-8 hover:border-primary transition-colors text-center">
+                <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-sm font-medium mb-1">
+                  Click to upload essay
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  PDF or DOCX (max 5MB)
+                </p>
+              </div>
+            </Label>
+            <Input
+              id="essay-upload"
+              type="file"
+              accept=".pdf,.docx,.doc"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+        )}
+      </div>
+
+      {file && (
+        <Button
+          type="button"
+          onClick={handleParse}
+          disabled={parsing}
+          className="w-full"
+        >
+          {parsing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Parsing with AI...
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4 mr-2" />
+              Parse Essay with AI
+            </>
+          )}
+        </Button>
+      )}
+    </div>
+  );
+};

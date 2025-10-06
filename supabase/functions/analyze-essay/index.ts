@@ -70,10 +70,19 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  console.log(`[${requestId}] ========== NEW ANALYSIS REQUEST ==========`);
+
   try {
     const { essayId, content, cvData } = await req.json();
+    console.log(`[${requestId}] Request params:`, { 
+      essayId, 
+      contentLength: content?.length, 
+      hasCvData: !!cvData 
+    });
 
     if (!content) {
+      console.error(`[${requestId}] Content is missing`);
       return new Response(
         JSON.stringify({ error: "Content is required" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -83,6 +92,7 @@ serve(async (req) => {
     // Get JWT from Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error(`[${requestId}] Missing authorization header`);
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -99,11 +109,14 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError || !user) {
+      console.error(`[${requestId}] Auth failed:`, userError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized: Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`[${requestId}] Authenticated user:`, user.id);
 
     // Fetch essay details including all metadata
     const { data: essayData, error: essayError } = await supabase
@@ -126,7 +139,7 @@ serve(async (req) => {
       .single();
 
     if (essayError) {
-      console.error('Error fetching essay:', essayError);
+      console.error(`[${requestId}] Error fetching essay:`, essayError);
       return new Response(
         JSON.stringify({ error: 'Essay not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -135,7 +148,7 @@ serve(async (req) => {
 
     // Authorization check: ensure user owns this essay
     if (essayData.writer_id !== user.id) {
-      console.error('Authorization failed: User does not own this essay');
+      console.error(`[${requestId}] Authorization failed: User does not own this essay`);
       return new Response(
         JSON.stringify({ error: 'Unauthorized: You do not have permission to analyze this essay' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -152,12 +165,16 @@ serve(async (req) => {
     const customCollegeName = essayData?.custom_college_name;
     const customProgrammeName = essayData?.custom_programme_name;
     
-    console.log('Essay analysis context:', { 
+    console.log(`[${requestId}] Essay analysis context:`, { 
+      collegeId,
+      programmeId,
       collegeTier, 
       englishVariant, 
       degreeLevel,
       hasQuestionnaire: !!questionnaireData,
-      isCustomCollege: !!customCollegeName
+      isCustomCollege: !!customCollegeName,
+      collegeName: essayData?.colleges?.name || customCollegeName,
+      programmeName: essayData?.programmes?.name || customProgrammeName
     });
 
     // Fetch successful essays only if college and programme are provided
@@ -173,8 +190,10 @@ serve(async (req) => {
         .limit(5);
 
       if (essaysError) {
-        console.error('Error fetching successful essays:', essaysError);
+        console.error(`[${requestId}] Error fetching successful essays:`, essaysError);
       }
+
+      console.log(`[${requestId}] Found ${successfulEssays?.length || 0} successful essays for RAG context`);
 
       // Construct RAG context if we have successful essays
       if (successfulEssays && successfulEssays.length > 0) {
@@ -353,7 +372,7 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
 
     // Determine which AI to use based on college tier
     const useClaude = collegeTier === 'premium';
-    console.log(`Using ${useClaude ? 'Claude Sonnet 4' : 'Gemini 2.5 Flash'} for college tier: ${collegeTier}`);
+    console.log(`[${requestId}] Using ${useClaude ? 'Claude Sonnet 4' : 'Gemini 2.5 Flash'} for college tier: ${collegeTier}`);
 
     let aiResponse;
     let usingFallback = false;
@@ -365,7 +384,7 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
         
         // If Claude fails, fallback to Gemini
         if (!aiResponse.ok) {
-          console.warn('Claude API failed, falling back to Gemini:', aiResponse.status);
+          console.warn(`[${requestId}] Claude API failed, falling back to Gemini:`, aiResponse.status);
           usingFallback = true;
           modelUsed = 'gemini-2.5-flash (fallback)';
           aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
@@ -374,7 +393,7 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
         aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
       }
     } catch (error) {
-      console.error('Primary AI call failed, attempting fallback:', error);
+      console.error(`[${requestId}] Primary AI call failed, attempting fallback:`, error);
       usingFallback = true;
       modelUsed = 'gemini-2.5-flash (fallback)';
       aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
@@ -382,21 +401,25 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
 
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
+        console.error(`[${requestId}] Rate limit exceeded`);
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       if (aiResponse.status === 402) {
+        console.error(`[${requestId}] Payment required`);
         return new Response(
           JSON.stringify({ error: 'Editorial feedback requires additional credits.' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       const errorText = await aiResponse.text();
-      console.error('AI gateway error:', aiResponse.status, errorText);
+      console.error(`[${requestId}] AI gateway error:`, aiResponse.status, errorText);
       throw new Error('AI analysis failed');
     }
+
+    console.log(`[${requestId}] AI response received successfully`);
 
     const aiData = await aiResponse.json();
     
@@ -489,14 +512,18 @@ Provide detailed reasoning for each score.`;
             });
 
           if (scoreError) {
-            console.error('Error storing essay scores:', scoreError);
+            console.error(`[${requestId}] Error storing essay scores:`, scoreError);
+          } else {
+            console.log(`[${requestId}] Essay scores stored successfully`);
           }
         }
       }
     } catch (scoreError) {
-      console.error('Error generating essay scores:', scoreError);
+      console.error(`[${requestId}] Error generating essay scores:`, scoreError);
       // Don't fail the entire request if scoring fails
     }
+
+    console.log(`[${requestId}] Analysis complete. Returning ${suggestionsWithIds.length} suggestions`);
 
     return new Response(
       JSON.stringify({ 
@@ -511,7 +538,7 @@ Provide detailed reasoning for each score.`;
     );
 
   } catch (error) {
-    console.error('Error in analyze-essay function:', error);
+    console.error(`[${requestId}] Error in analyze-essay function:`, error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

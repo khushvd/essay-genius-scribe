@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { ChevronDown, Upload, FileText, X } from "lucide-react";
 import { z } from "zod";
+import { EssayUploadParser } from "@/components/editor/EssayUploadParser";
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -94,6 +95,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
   const [questionnaireOpen, setQuestionnaireOpen] = useState(false);
   const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
   const [questionnaireText, setQuestionnaireText] = useState("");
+  const [entryMode, setEntryMode] = useState<"manual" | "upload">("manual");
 
   useEffect(() => {
     const fetchColleges = async () => {
@@ -230,6 +232,37 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
     }
   };
 
+  const handleParsedData = (parsedData: {
+    title: string;
+    content: string;
+    collegeName?: string;
+    programmeName?: string;
+  }) => {
+    setTitle(parsedData.title);
+    setContent(parsedData.content);
+    
+    // Auto-fill college if parsed
+    if (parsedData.collegeName) {
+      const matchedCollege = colleges.find(
+        (c) => c.name.toLowerCase().includes(parsedData.collegeName!.toLowerCase())
+      );
+      if (matchedCollege) {
+        setCollegeId(matchedCollege.id);
+      } else {
+        setIsCustomCollege(true);
+        setCustomCollegeName(parsedData.collegeName);
+      }
+    }
+
+    // Auto-fill programme if parsed
+    if (parsedData.programmeName) {
+      setCustomProgrammeName(parsedData.programmeName);
+    }
+
+    // Switch to manual mode to allow editing
+    setEntryMode("manual");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -326,25 +359,36 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="title">Essay Prompt (if any)</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Describe a challenge you overcame..."
-            />
-          </div>
+        <Tabs value={entryMode} onValueChange={(v) => setEntryMode(v as "manual" | "upload")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+            <TabsTrigger value="upload">Upload & Parse with AI</TabsTrigger>
+          </TabsList>
 
-          <div className="space-y-2">
-            <Label>Degree Level</Label>
-            <Select value={degreeLevel} onValueChange={(value: "bachelors" | "masters") => setDegreeLevel(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-background z-50">
-                <SelectItem value="bachelors">Bachelor's</SelectItem>
+          <TabsContent value="upload" className="space-y-4">
+            <EssayUploadParser onParsed={handleParsedData} />
+          </TabsContent>
+
+          <TabsContent value="manual" asChild>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="title">Essay Prompt (if any)</Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g., Describe a challenge you overcame..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Degree Level</Label>
+                <Select value={degreeLevel} onValueChange={(value: "bachelors" | "masters") => setDegreeLevel(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    <SelectItem value="bachelors">Bachelor's</SelectItem>
                 <SelectItem value="masters">Master's</SelectItem>
               </SelectContent>
             </Select>
@@ -721,19 +765,21 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
             </Tabs>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Essay"}
-            </Button>
-          </div>
-        </form>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Creating..." : "Create Essay"}
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

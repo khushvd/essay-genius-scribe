@@ -17,20 +17,22 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("No authorization header");
     }
 
-    const supabase = createClient(
+    // Create Supabase client with service role key for proper auth verification
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Verify JWT token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    
     if (userError || !user) {
+      console.error("Auth verification failed:", userError);
       throw new Error("Unauthorized");
     }
+
+    console.log("Training snapshot request from user:", user.id);
 
     const { 
       essayId, 
@@ -42,7 +44,7 @@ const handler = async (req: Request): Promise<Response> => {
     } = await req.json();
 
     // Fetch essay to verify ownership
-    const { data: essay, error: essayError } = await supabase
+    const { data: essay, error: essayError } = await supabaseAdmin
       .from("essays")
       .select("*")
       .eq("id", essayId)
@@ -50,11 +52,12 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (essayError || !essay) {
+      console.error("Essay fetch error:", essayError);
       throw new Error("Essay not found or access denied");
     }
 
     // Fetch before and after scores
-    const { data: scores } = await supabase
+    const { data: scores } = await supabaseAdmin
       .from("essay_scores")
       .select("*")
       .eq("essay_id", essayId)
@@ -92,7 +95,7 @@ const handler = async (req: Request): Promise<Response> => {
     };
 
     // Create training snapshot
-    const { data: snapshot, error: snapshotError } = await supabase
+    const { data: snapshot, error: snapshotError } = await supabaseAdmin
       .from("training_essays")
       .insert({
         essay_id: essayId,

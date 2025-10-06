@@ -17,25 +17,27 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("No authorization header");
     }
 
-    const supabase = createClient(
+    // Create Supabase client with service role key for proper auth verification
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Verify JWT token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    
     if (userError || !user) {
+      console.error("Auth verification failed:", userError);
       throw new Error("Unauthorized");
     }
+
+    console.log("Export request from user:", user.id);
 
     const { essayId } = await req.json();
 
     // Fetch essay and verify ownership
-    const { data: essay, error: essayError } = await supabase
+    const { data: essay, error: essayError } = await supabaseAdmin
       .from("essays")
       .select("*")
       .eq("id", essayId)
