@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Sparkles, Upload } from "lucide-react";
+import { Plus, Trash2, Sparkles, Upload, Edit, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import mammoth from "mammoth";
@@ -36,6 +36,8 @@ export const PortfolioManager = () => {
     key_strategies: "",
     degree_level: "bachelors"
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -192,7 +194,7 @@ export const PortfolioManager = () => {
         }
       }
 
-      const { error } = await supabase.from('successful_essays').insert({
+      const essayData = {
         college_id: formData.college_id || null,
         programme_id: formData.programme_id || null,
         essay_title: formData.essay_title,
@@ -202,33 +204,83 @@ export const PortfolioManager = () => {
         performance_score: formData.performance_score,
         key_strategies: strategiesArray,
         degree_level: formData.degree_level
-      });
+      };
+
+      let error;
+      
+      if (isEditing && editingId) {
+        const result = await supabase
+          .from('successful_essays')
+          .update(essayData)
+          .eq('id', editingId);
+        error = result.error;
+        
+        if (!error) {
+          toast.success("Essay updated successfully");
+        }
+      } else {
+        const result = await supabase
+          .from('successful_essays')
+          .insert(essayData);
+        error = result.error;
+        
+        if (!error) {
+          toast.success("Successful essay added to portfolio");
+        }
+      }
 
       if (error) throw error;
 
-      toast.success("Successful essay added to portfolio");
-      setFormData({
-        college_id: "",
-        programme_id: "",
-        essay_title: "",
-        essay_content: "",
-        writer_resume: "",
-        writer_questionnaire: "",
-        performance_score: 85,
-        key_strategies: "",
-        degree_level: "bachelors"
-      });
-      setAiParsedData(null);
-      setEssayFile(null);
-      setResumeFile(null);
-      setQuestionnaireFile(null);
+      handleCancelEdit();
       fetchData();
     } catch (error) {
-      console.error('Error adding essay:', error);
-      toast.error("Failed to add essay");
+      console.error('Error saving essay:', error);
+      toast.error(isEditing ? "Failed to update essay" : "Failed to add essay");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEdit = (essay: any) => {
+    setEditingId(essay.id);
+    setIsEditing(true);
+    setFormData({
+      college_id: essay.college_id || "",
+      programme_id: essay.programme_id || "",
+      essay_title: essay.essay_title || "",
+      essay_content: essay.essay_content || "",
+      writer_resume: essay.writer_resume || "",
+      writer_questionnaire: essay.writer_questionnaire ? JSON.stringify(essay.writer_questionnaire, null, 2) : "",
+      performance_score: essay.performance_score || 85,
+      key_strategies: Array.isArray(essay.key_strategies) ? essay.key_strategies.join('\n') : "",
+      degree_level: essay.degree_level || "bachelors"
+    });
+    
+    if (essay.college_id) {
+      fetchProgrammes(essay.college_id);
+    }
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setIsEditing(false);
+    setFormData({
+      college_id: "",
+      programme_id: "",
+      essay_title: "",
+      essay_content: "",
+      writer_resume: "",
+      writer_questionnaire: "",
+      performance_score: 85,
+      key_strategies: "",
+      degree_level: "bachelors"
+    });
+    setAiParsedData(null);
+    setEssayFile(null);
+    setResumeFile(null);
+    setQuestionnaireFile(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -252,8 +304,10 @@ export const PortfolioManager = () => {
 
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Add Winning Essay</h3>
-          {aiParsedData && (
+          <h3 className="text-lg font-semibold">
+            {isEditing ? "Edit Essay" : "Add Winning Essay"}
+          </h3>
+          {aiParsedData && !isEditing && (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
               AI Parsed
@@ -455,10 +509,27 @@ export const PortfolioManager = () => {
             </div>
           </div>
 
-          <Button type="submit" disabled={loading || !formData.essay_content || !formData.essay_title}>
-            <Upload className="w-4 h-4 mr-2" />
-            {loading ? "Adding..." : (aiParsedData ? "Add Parsed Essay to Portfolio" : "Add to Portfolio")}
-          </Button>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={loading || !formData.essay_content || !formData.essay_title}>
+              {isEditing ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  {loading ? "Updating..." : "Update Essay"}
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  {loading ? "Adding..." : (aiParsedData ? "Add Parsed Essay to Portfolio" : "Add to Portfolio")}
+                </>
+              )}
+            </Button>
+            
+            {isEditing && (
+              <Button type="button" variant="outline" onClick={handleCancelEdit}>
+                Cancel Edit
+              </Button>
+            )}
+          </div>
         </form>
       </Card>
 
@@ -473,13 +544,22 @@ export const PortfolioManager = () => {
                   {essay.colleges?.name} - {essay.programmes?.name} (Score: {essay.performance_score})
                 </p>
               </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleDelete(essay.id)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEdit(essay)}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDelete(essay.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
