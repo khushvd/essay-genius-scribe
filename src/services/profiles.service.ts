@@ -59,10 +59,10 @@ export const profilesService = {
 
   async listUsers(): Promise<Result<ProfileWithRole[], DatabaseError>> {
     try {
-      // Fetch profiles
+      // Single joined query using Supabase relational syntax
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, user_roles(role)')
         .order('created_at', { ascending: false });
 
       if (profilesError) {
@@ -72,28 +72,17 @@ export const profilesService = {
         };
       }
 
-      // Fetch user roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-
-      if (rolesError) {
-        return { 
-          success: false, 
-          error: new DatabaseError(rolesError.message, rolesError.code) 
+      // Format data to match expected interface
+      const usersWithRoles: ProfileWithRole[] = profilesData?.map(profile => {
+        const userRoles = Array.isArray(profile.user_roles) && profile.user_roles.length > 0
+          ? profile.user_roles
+          : [{ role: 'free' as const }];
+        
+        return {
+          ...profile,
+          user_roles: userRoles
         };
-      }
-
-      // Create a map of user_id to role
-      const rolesMap = new Map(
-        rolesData?.map(r => [r.user_id, r.role]) || []
-      );
-
-      // Combine profiles with roles
-      const usersWithRoles: ProfileWithRole[] = profilesData?.map(profile => ({
-        ...profile,
-        user_roles: [{ role: rolesMap.get(profile.id) || 'free' }]
-      })) || [];
+      }) || [];
 
       return { success: true, data: usersWithRoles };
     } catch (error) {

@@ -40,28 +40,43 @@ export const checkRole = async (
   userId: string,
   requiredRole: 'free' | 'premium' | 'admin'
 ): Promise<boolean> => {
-  const { data, error } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-  if (error || !data) {
-    return false;
+    // Database error - throw it
+    if (error) {
+      throw new AuthError('Failed to check user role', error.code);
+    }
+
+    // No role found - legitimate permission denial
+    if (!data) {
+      return false;
+    }
+
+    // Admin has access to everything
+    if (data.role === 'admin') {
+      return true;
+    }
+
+    // Premium has access to premium and free features
+    if (requiredRole === 'premium' && data.role === 'premium') {
+      return true;
+    }
+
+    // Match exact role
+    return data.role === requiredRole;
+  } catch (error) {
+    // Re-throw if already an AuthError
+    if (error instanceof AuthError) {
+      throw error;
+    }
+    // Wrap other errors
+    throw new AuthError('Failed to check user role');
   }
-
-  // Admin has access to everything
-  if (data.role === 'admin') {
-    return true;
-  }
-
-  // Premium has access to premium and free features
-  if (requiredRole === 'premium' && data.role === 'premium') {
-    return true;
-  }
-
-  // Match exact role
-  return data.role === requiredRole;
 };
 
 export const getAccessToken = async (): Promise<string | null> => {

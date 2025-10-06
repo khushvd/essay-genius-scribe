@@ -44,12 +44,21 @@ export const AuthForm = () => {
           return;
         }
 
-        const profileResult = await profilesService.getProfile(result.data.user.id);
+        // First attempt to fetch profile
+        let profileResult = await profilesService.getProfile(result.data.user.id);
+        
+        // Retry once if failed
         if (!profileResult.success) {
-          toast.error('Unable to verify account status');
-          await authService.signOut();
-          setLoading(false);
-          return;
+          console.log('Profile fetch failed, retrying in 1 second...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          profileResult = await profilesService.getProfile(result.data.user.id);
+          
+          // If retry also fails, show error but DON'T sign out
+          if (!profileResult.success) {
+            toast.error('Unable to load profile. Please refresh the page.');
+            setLoading(false);
+            return;
+          }
         }
 
         const { account_status } = profileResult.data;

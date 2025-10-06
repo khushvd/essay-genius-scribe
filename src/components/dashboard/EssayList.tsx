@@ -7,6 +7,7 @@ import { FileText, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { analyticsService } from "@/services/analytics.service";
+import { toast } from "sonner";
 
 interface EssayListProps {
   userId: string;
@@ -30,6 +31,10 @@ export const EssayList = ({ userId }: EssayListProps) => {
         const scoresResult = await analyticsService.getScoresForEssays(essayIds);
         if (scoresResult.success) {
           setEssayScores(scoresResult.data);
+        } else {
+          // Don't block essay rendering - scores are supplementary
+          console.error('Failed to load scores:', scoresResult.error);
+          toast.warning('Unable to load essay scores');
         }
       }
     }
