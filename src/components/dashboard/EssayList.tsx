@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { essaysService } from "@/services/essays.service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { analyticsService } from "@/services/analytics.service";
 
 interface EssayListProps {
   userId: string;
@@ -16,66 +18,34 @@ export const EssayList = ({ userId }: EssayListProps) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchEssays = async () => {
-      const { data, error } = await supabase
-        .from("essays")
-        .select(`
-          *,
-          colleges (name),
-          programmes (name)
-        `)
-        .eq("writer_id", userId)
-        .order("updated_at", { ascending: false });
-
-      if (!error && data) {
-        setEssays(data);
-        
-        // Fetch latest scores for all essays
-        const essayIds = data.map(e => e.id);
-        if (essayIds.length > 0) {
-          const { data: scoresData } = await supabase
-            .from('essay_scores')
-            .select('essay_id, overall_score, scored_at')
-            .in('essay_id', essayIds)
-            .order('scored_at', { ascending: false });
-
-          if (scoresData) {
-            const latestScores: Record<string, number> = {};
-            scoresData.forEach(score => {
-              if (!latestScores[score.essay_id]) {
-                latestScores[score.essay_id] = score.overall_score || 0;
-              }
-            });
-            setEssayScores(latestScores);
-          }
+  const fetchEssays = async () => {
+    const result = await essaysService.listEssays(userId);
+    
+    if (result.success) {
+      setEssays(result.data);
+      
+      // Fetch scores for all essays
+      const essayIds = result.data.map(e => e.id);
+      if (essayIds.length > 0) {
+        const scoresResult = await analyticsService.getScoresForEssays(essayIds);
+        if (scoresResult.success) {
+          setEssayScores(scoresResult.data);
         }
       }
-      setLoading(false);
-    };
+    }
+    setLoading(false);
+  };
 
+  useEffect(() => {
     fetchEssays();
-
-    const channel = supabase
-      .channel("essays_changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "essays",
-          filter: `writer_id=eq.${userId}`,
-        },
-        () => {
-          fetchEssays();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [userId]);
+
+  // Use realtime subscription hook
+  useRealtimeSubscription({
+    table: 'essays',
+    filter: `writer_id=eq.${userId}`,
+    onUpdate: fetchEssays,
+  });
 
   if (loading) {
     return (

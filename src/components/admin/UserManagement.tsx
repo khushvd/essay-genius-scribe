@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { profilesService } from "@/services/profiles.service";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { UserPlus, Search, CheckCircle, XCircle, Ban } from "lucide-react";
 import { AddUserDialog } from "./AddUserDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export const UserManagement = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -19,49 +20,22 @@ export const UserManagement = () => {
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
+  const fetchUsers = async () => {
+    setLoading(true);
+    const result = await profilesService.listUsers();
+    
+    if (result.success) {
+      setUsers(result.data);
+      setFilteredUsers(result.data);
+    } else {
+      toast.error("Failed to load users");
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      // Fetch profiles first
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (profilesError) throw profilesError;
-
-      // Fetch all user roles separately
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-
-      if (rolesError) throw rolesError;
-
-      // Create a map of user_id to role for quick lookup
-      const rolesMap = new Map(
-        rolesData?.map(r => [r.user_id, r.role]) || []
-      );
-
-      // Combine profiles with their roles
-      const usersWithRoles = profilesData?.map(profile => ({
-        ...profile,
-        role: rolesMap.get(profile.id) || 'free',
-        user_roles: [{ role: rolesMap.get(profile.id) || 'free' }]
-      })) || [];
-
-      setUsers(usersWithRoles);
-      setFilteredUsers(usersWithRoles);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast.error("Failed to load users");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     let filtered = users;
@@ -90,7 +64,6 @@ export const UserManagement = () => {
   const handleRoleChange = async (userId: string, newRole: 'free' | 'premium' | 'admin') => {
     setUpdatingUserId(userId);
     
-    // Store old role for rollback
     const previousUsers = [...users];
     
     // Optimistic update
@@ -100,43 +73,28 @@ export const UserManagement = () => {
       )
     );
 
-    try {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role: newRole })
-        .eq('user_id', userId);
+    const result = await profilesService.updateUserRole(userId, newRole);
 
-      if (error) {
-        console.error('Error updating role:', error);
-        // Rollback on error
-        setUsers(previousUsers);
-        toast.error('Failed to update role: ' + error.message);
-      } else {
-        toast.success(`Role updated to ${newRole}`);
-      }
-    } catch (error) {
-      console.error('Error in handleRoleChange:', error);
+    if (!result.success) {
       setUsers(previousUsers);
-      toast.error('An error occurred while updating the role');
-    } finally {
-      setUpdatingUserId(null);
+      toast.error('Failed to update role: ' + result.error.message);
+    } else {
+      toast.success(`Role updated to ${newRole}`);
     }
+    
+    setUpdatingUserId(null);
   };
 
   const handleStatusChange = async (userId: string, newStatus: 'approved' | 'rejected' | 'suspended', userEmail: string, userName: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          account_status: newStatus,
-          approved_by: user?.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+      const result = await profilesService.updateAccountStatus(userId, newStatus, user?.id || '');
 
-      if (error) throw error;
+      if (!result.success) {
+        toast.error(result.error.message);
+        return;
+      }
 
       // Send email notification
       const emailType = newStatus === 'approved' ? 'approval' : newStatus === 'rejected' ? 'rejection' : 'suspension';
