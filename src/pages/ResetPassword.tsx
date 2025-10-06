@@ -17,10 +17,21 @@ const ResetPassword = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have access token from the reset link
-    const accessToken = searchParams.get('access_token');
-    if (!accessToken) {
-      toast.error("Invalid or expired reset link");
+    const token = searchParams.get('token');
+    const type = searchParams.get('type');
+    
+    // Handle password reset token exchange
+    if (token && type === 'recovery') {
+      supabase.auth.verifyOtp({
+        token_hash: token,
+        type: 'recovery'
+      }).catch((error) => {
+        console.error('Token verification error:', error);
+        toast.error('Invalid or expired reset link. Please request a new one.');
+        navigate('/auth');
+      });
+    } else if (!token) {
+      toast.error('Invalid reset link');
       navigate('/auth');
     }
   }, [searchParams, navigate]);

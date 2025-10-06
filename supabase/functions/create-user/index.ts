@@ -105,7 +105,7 @@ serve(async (req) => {
         user_id: newUser.user.id,
         role: role
       }, {
-        onConflict: 'user_id,role'
+        onConflict: 'user_id'
       });
 
     if (roleError) {
