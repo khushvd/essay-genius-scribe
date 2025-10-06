@@ -231,6 +231,16 @@ export const UserManagement = () => {
                       Suspend
                     </Button>
                   )}
+                  {user.account_status === 'suspended' && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleStatusChange(user.id, 'approved', user.email, user.full_name)}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Unsuspend
+                    </Button>
+                  )}
                   <div className="flex items-center gap-2">
                     <Select
                       value={currentRole}

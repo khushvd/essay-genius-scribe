@@ -8,6 +8,7 @@ import { PenLine } from "lucide-react";
 import { authService } from "@/services/auth.service";
 import { profilesService } from "@/services/profiles.service";
 import { authValidationSchema } from "@/lib/validation/schemas";
+import { ForgotPasswordDialog } from "./ForgotPasswordDialog";
 
 export const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,6 +16,7 @@ export const AuthForm = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -107,8 +109,25 @@ export const AuthForm = () => {
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={6} />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {isLogin && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    onClick={() => setForgotPasswordOpen(true)}
+                  >
+                    Forgot password?
+                  </Button>
+                )}
+              </div>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={10} />
+              {!isLogin && (
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 10 characters with uppercase, lowercase, number, and special character
+                </p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
@@ -116,6 +135,11 @@ export const AuthForm = () => {
           </form>
         </div>
       </div>
+
+      <ForgotPasswordDialog
+        open={forgotPasswordOpen}
+        onOpenChange={setForgotPasswordOpen}
+      />
     </div>
   );
 };
