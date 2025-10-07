@@ -37,11 +37,11 @@ const Editor = () => {
 
   // Initialize content when essay loads
   useEffect(() => {
-    if (essay?.content && essay.content !== content) {
-      setContent(essay.content);
-      setIsContentInitialized(true);
-    }
-  }, [essay?.content]); // Add essay?.content to dependencies;
+  if (essay && !isContentInitialized) {
+    setContent(essay.content || '');
+    setIsContentInitialized(true);
+  }
+}, [essay, isContentInitialized];
 
   const handleSave = async () => {
     setSaving(true);
