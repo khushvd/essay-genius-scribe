@@ -71,6 +71,15 @@ async function callGeminiAPI(systemPrompt: string, userPrompt: string, tools: an
   return response;
 }
 
+function normalizeContent(text: string): string {
+  return text
+    .replace(/['']/g, "'")     // Smart single quotes -> straight
+    .replace(/[""]/g, '"')     // Smart double quotes -> straight
+    .replace(/—/g, '-')        // Em dash -> hyphen
+    .replace(/–/g, '-')        // En dash -> hyphen
+    .replace(/…/g, '...');     // Ellipsis -> three dots
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -95,6 +104,9 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Normalize content to handle character encoding differences
+    const normalizedContent = normalizeContent(content);
 
     // Get JWT from Authorization header
     const authHeader = req.headers.get('Authorization');
@@ -191,7 +203,7 @@ serve(async (req) => {
       const scoringPrompt = `Based on this essay, provide detailed scores:
 
 Essay Content:
-${content}
+${normalizedContent}
 
 Score the essay on these dimensions (0-100 each):
 1. Overall Quality - holistic assessment
@@ -405,7 +417,7 @@ ${cvData ? `\nWRITER'S CV/RESUME:\n${typeof cvData === 'string' ? cvData : JSON.
 ${questionnaireContext}
 
 ESSAY TO ANALYZE:
-${content}
+${normalizedContent}
 
 Please analyze this essay and provide editorial feedback with a humanised, conversational tone. For each suggestion, identify:
 - The exact text that needs attention (with character positions)
@@ -621,7 +633,7 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
       return true;
     };
 
-    const validatedSuggestions = suggestionsWithIds.filter((s: any) => validateSuggestion(s, content));
+    const validatedSuggestions = suggestionsWithIds.filter((s: any) => validateSuggestion(s, normalizedContent));
     console.log(`[${requestId}] Filtered ${suggestionsWithIds.length - validatedSuggestions.length} invalid suggestions`);
 
     // Deduplicate suggestions by location
@@ -643,7 +655,7 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
     // Generate essay score using second AI call
     const scorePrompt = `Based on the essay analysis, provide detailed quality scores.
 
-Essay: ${content}
+Essay: ${normalizedContent}
 
 Feedback provided: ${JSON.stringify(feedbackData.suggestions, null, 2)}
 
