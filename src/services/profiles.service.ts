@@ -59,32 +59,66 @@ export const profilesService = {
 
   async listUsers(): Promise<Result<ProfileWithRole[], DatabaseError>> {
     try {
-      // Single joined query using Supabase relational syntax
-      const { data: profilesData, error: profilesError } = await supabase
+      // Try joined query using relational syntax
+      const { data: joinedData, error: joinedError } = await supabase
         .from('profiles')
         .select('*, user_roles(role)')
         .order('created_at', { ascending: false });
 
-      if (profilesError) {
-        return { 
-          success: false, 
-          error: new DatabaseError(profilesError.message, profilesError.code) 
+      // If join works, format and return
+      if (!joinedError && joinedData) {
+        const usersWithRoles: ProfileWithRole[] = joinedData.map((profile: any) => {
+          const userRoles = Array.isArray(profile.user_roles) && profile.user_roles.length > 0
+            ? profile.user_roles
+            : [{ role: 'free' as const }];
+          return {
+            ...profile,
+            user_roles: userRoles
+          };
+        });
+        return { success: true, data: usersWithRoles };
+      }
+
+      // Fallback: handle missing relationship or other join errors by fetching separately
+      if (joinedError) {
+        console.warn('Falling back to separate queries for user roles:', joinedError);
+      }
+
+      const { data: profilesOnly, error: profilesOnlyError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (profilesOnlyError || !profilesOnly) {
+        const err = profilesOnlyError || joinedError;
+        return {
+          success: false,
+          error: new DatabaseError(err?.message || 'Failed to load users', err?.code)
         };
       }
 
-      // Format data to match expected interface
-      const usersWithRoles: ProfileWithRole[] = profilesData?.map(profile => {
-        const userRoles = Array.isArray(profile.user_roles) && profile.user_roles.length > 0
-          ? profile.user_roles
-          : [{ role: 'free' as const }];
-        
-        return {
-          ...profile,
-          user_roles: userRoles
-        };
-      }) || [];
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
 
-      return { success: true, data: usersWithRoles };
+      const rolesByUser = (rolesData || []).reduce((acc: Record<string, Array<{ role: 'free' | 'premium' | 'admin' }>>, r: any) => {
+        const key = r.user_id as string;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push({ role: r.role });
+        return acc;
+      }, {});
+
+      const merged: ProfileWithRole[] = profilesOnly.map((p: any) => ({
+        ...p,
+        user_roles: rolesByUser[p.id] && rolesByUser[p.id].length > 0 ? rolesByUser[p.id] : [{ role: 'free' as const }],
+      }));
+
+      // If roles fetch errored, still return merged with defaults
+      if (rolesError) {
+        console.warn('Roles query error, defaulting to free roles:', rolesError);
+      }
+
+      return { success: true, data: merged };
     } catch (error) {
       return { success: false, error: handleError(error) as DatabaseError };
     }
