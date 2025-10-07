@@ -37,11 +37,11 @@ const Editor = () => {
 
   // Initialize content when essay loads
   useEffect(() => {
-  if (essay && !isContentInitialized) {
-    setContent(essay.content || '');
-    setIsContentInitialized(true);
-  }
-}, [essay, isContentInitialized];
+    if (essay && !isContentInitialized) {
+      setContent(essay.content || "");
+      setIsContentInitialized(true);
+    }
+  }, [essay, isContentInitialized]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -60,7 +60,7 @@ const Editor = () => {
   };
 
   const sanitizeFilename = (value: string | null | undefined): string => {
-    return value?.trim() || 'unnamed';
+    return value?.trim() || "unnamed";
   };
 
   const handleExportAsWord = async () => {
@@ -100,12 +100,12 @@ const Editor = () => {
 
       // Update last_exported_at timestamp
       const { error: updateError } = await supabase
-        .from('essays')
+        .from("essays")
         .update({ last_exported_at: new Date().toISOString() })
-        .eq('id', essay.id);
+        .eq("id", essay.id);
 
       if (updateError) {
-        console.error('Failed to update export timestamp:', updateError);
+        console.error("Failed to update export timestamp:", updateError);
         // Don't show error to user - export succeeded
       }
 
@@ -136,18 +136,11 @@ const Editor = () => {
             <h2 className="text-xl font-semibold mb-2">Failed to Load Essay</h2>
             <p className="text-muted-foreground mb-6">{error}</p>
             <div className="flex gap-3">
-              <Button 
-                onClick={retry} 
-                className="flex-1"
-              >
+              <Button onClick={retry} className="flex-1">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Retry
               </Button>
-              <Button 
-                onClick={() => navigate("/dashboard")} 
-                variant="outline"
-                className="flex-1"
-              >
+              <Button onClick={() => navigate("/dashboard")} variant="outline" className="flex-1">
                 Back to Dashboard
               </Button>
             </div>
