@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 // Helper function to call Claude API
-async function callClaudeAPI(systemPrompt: string, userPrompt: string, tools: any[]) {
+async function callClaudeAPI(systemPrompt: string, userPrompt: string, tools: any[], toolName: string) {
   const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
   if (!ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not configured');
@@ -37,7 +37,7 @@ async function callClaudeAPI(systemPrompt: string, userPrompt: string, tools: an
         description: t.function.description,
         input_schema: t.function.parameters
       })),
-      tool_choice: { type: 'tool', name: 'provide_editorial_feedback' }
+      tool_choice: { type: 'tool', name: toolName }
     }),
   });
 
@@ -227,7 +227,7 @@ Provide brief reasoning for the overall score.`;
                 required: ['overall_score', 'clarity_score', 'impact_score', 'authenticity_score', 'coherence_score', 'reasoning']
               }
             }
-          }]);
+          }], 'score_essay');
         } else {
           scoreResponse = await callGeminiAPI('You are an expert essay scorer.', scoringPrompt, [{
             type: 'function',
@@ -509,7 +509,7 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
 
     try {
       if (useClaude) {
-        aiResponse = await callClaudeAPI(systemPrompt, userPrompt, tools);
+        aiResponse = await callClaudeAPI(systemPrompt, userPrompt, tools, 'provide_editorial_feedback');
         
         // If Claude fails, fallback to Gemini
         if (!aiResponse.ok) {
@@ -658,7 +658,7 @@ Provide detailed reasoning for each score.`;
 
     try {
       const scoreResponse = useClaude && !usingFallback
-        ? await callClaudeAPI(systemPrompt, scorePrompt, tools)
+        ? await callClaudeAPI(systemPrompt, scorePrompt, tools, 'score_essay')
         : await callGeminiAPI(systemPrompt, scorePrompt, tools);
 
       if (scoreResponse.ok) {
