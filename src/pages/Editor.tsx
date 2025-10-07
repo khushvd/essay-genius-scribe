@@ -21,6 +21,7 @@ const Editor = () => {
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isContentInitialized, setIsContentInitialized] = useState(false);
 
   // Use custom hooks
   const { essay, loading, error, retry } = useEssayData(id);
@@ -28,6 +29,7 @@ const Editor = () => {
     essayId: id || "",
     content,
     originalContent: essay?.content || "",
+    enabled: isContentInitialized,
   });
   const { suggestions, appliedSuggestions, setSuggestions, applySuggestion, dismissSuggestion } = useEssaySuggestions(
     id || "",
@@ -37,6 +39,7 @@ const Editor = () => {
   useEffect(() => {
     if (essay?.content && essay.content !== content) {
       setContent(essay.content);
+      setIsContentInitialized(true);
     }
   }, [essay?.content]); // Add essay?.content to dependencies;
 

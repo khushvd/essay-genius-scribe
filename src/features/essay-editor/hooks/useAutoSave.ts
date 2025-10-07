@@ -8,6 +8,7 @@ interface UseAutoSaveOptions {
   content: string;
   originalContent: string;
   debounceMs?: number;
+  enabled?: boolean;
 }
 
 interface UseAutoSaveResult {
@@ -22,6 +23,7 @@ export const useAutoSave = ({
   content,
   originalContent,
   debounceMs = 2000,
+  enabled = true,
 }: UseAutoSaveOptions): UseAutoSaveResult => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -50,11 +52,11 @@ export const useAutoSave = ({
   );
 
   useEffect(() => {
-    if (content !== originalContent) {
+    if (enabled !== false && content !== originalContent) {
       setHasUnsavedChanges(true);
       debouncedSave(content);
     }
-  }, [content, originalContent, debouncedSave]);
+  }, [content, originalContent, debouncedSave, enabled]);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
