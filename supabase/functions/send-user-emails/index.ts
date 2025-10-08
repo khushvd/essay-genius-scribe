@@ -17,10 +17,7 @@ interface EmailRequest {
   temporaryPassword?: string;
 }
 
-const ADMIN_EMAILS = [
-  "khushvardhandembla@gmail.com",
-  "simran.sachdeva.official@gmail.com"
-];
+const ADMIN_EMAILS = ["khushvardhandembla@gmail.com", "simran.sachdeva.official@gmail.com"];
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -28,7 +25,8 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, recipientEmail, recipientName, adminName, reason, temporaryPassword }: EmailRequest = await req.json();
+    const { type, recipientEmail, recipientName, adminName, reason, temporaryPassword }: EmailRequest =
+      await req.json();
 
     let subject = "";
     let html = "";
@@ -99,30 +97,27 @@ const handler = async (req: Request): Promise<Response> => {
           <p>Please log in to the admin dashboard to review and approve this account.</p>
           <p><a href="${Deno.env.get("SUPABASE_URL")?.replace("/v1", "")}/dashboard">Go to Admin Dashboard</a></p>
         `;
-        
+
         // Send to all admin emails
-        const adminPromises = ADMIN_EMAILS.map(adminEmail => 
+        const adminPromises = ADMIN_EMAILS.map((adminEmail) =>
           resend.emails.send({
-            from: "Sandwich Essay <onboarding@resend.dev>",
+            from: "Sandwich Essay <onboarding@editor.sandwichglobal.com>",
             to: [adminEmail],
             subject,
             html,
-          })
+          }),
         );
-        
+
         await Promise.all(adminPromises);
-        
-        return new Response(
-          JSON.stringify({ success: true, message: "Admin notifications sent" }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+
+        return new Response(JSON.stringify({ success: true, message: "Admin notifications sent" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
     }
 
     const emailResponse = await resend.emails.send({
-      from: "Sandwich Essay <onboarding@resend.dev>",
+      from: "Sandwich Essay <onboarding@editor.sandwichglobal.com>",
       to: [recipientEmail],
       subject,
       html,
@@ -136,13 +131,10 @@ const handler = async (req: Request): Promise<Response> => {
     });
   } catch (error: any) {
     console.error("Error in send-user-emails function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 };
 
