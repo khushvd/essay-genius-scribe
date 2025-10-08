@@ -63,14 +63,68 @@ const EditorSuggestions = ({
   const [analysisId, setAnalysisId] = useState<string>("");
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
 
+  // Check for existing analysis on mount
+  useEffect(() => {
+    const loadExistingAnalysis = async () => {
+      if (!essayId || suggestions.length > 0) return;
+
+      // Check cache first
+      const contentHash = generateContentHash(content);
+      const cacheKey = `${essayId}-analyzed-${contentHash}`;
+      const cached = sessionStorage.getItem(cacheKey);
+
+      if (cached) {
+        // Try to load suggestions from database
+        try {
+          const { data, error } = await supabase
+            .from('essay_analytics')
+            .select('*')
+            .eq('essay_id', essayId)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (!error && data && data.length > 0) {
+            // Group by suggestion_id and reconstruct suggestions
+            const suggestionMap = new Map();
+            data.forEach((record) => {
+              if (!suggestionMap.has(record.suggestion_id)) {
+                suggestionMap.set(record.suggestion_id, {
+                  id: record.suggestion_id,
+                  type: record.suggestion_type,
+                  originalText: record.original_text || '',
+                  suggestion: record.suggested_text || '',
+                  reasoning: record.reasoning || '',
+                  issue: '',
+                  evidence: '',
+                  location: { start: 0, end: 0 }
+                });
+              }
+            });
+
+            const loadedSuggestions = Array.from(suggestionMap.values());
+            if (loadedSuggestions.length > 0) {
+              onSuggestionsUpdate?.(loadedSuggestions);
+              setHasAnalyzed(true);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Error loading existing analysis:', err);
+        }
+      }
+    };
+
+    loadExistingAnalysis();
+  }, [essayId]);
+
   // Auto-analyze when all required data is loaded (with caching)
   useEffect(() => {
     if (!essayId || !content.trim() || content.length < 50) {
       return;
     }
 
-    // Only auto-analyze if we have no suggestions
-    if (suggestions.length > 0) {
+    // Only auto-analyze if we have no suggestions and haven't analyzed yet
+    if (suggestions.length > 0 || hasAnalyzed) {
       return;
     }
 
@@ -84,7 +138,7 @@ const EditorSuggestions = ({
     const cacheKey = `${essayId}-analyzed-${contentHash}`;
     const cached = sessionStorage.getItem(cacheKey);
     
-    if (cached && !hasAnalyzed) {
+    if (cached) {
       setHasAnalyzed(true);
       return;
     }
@@ -146,10 +200,15 @@ const EditorSuggestions = ({
       }
       setHasAnalyzed(true);
 
-      // Cache the analysis result
+      // Cache the analysis result with timestamp and count
       const contentHash = generateContentHash(content);
       const cacheKey = `${essayId}-analyzed-${contentHash}`;
-      sessionStorage.setItem(cacheKey, 'true');
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        timestamp: Date.now(),
+        count: data?.suggestions?.length || 0
+      }));
+      // Store content hash for loading screen
+      sessionStorage.setItem(`${essayId}-content-hash`, contentHash);
     } catch (err) {
       console.error('Error calling analyze-essay:', err);
       toast.error("Failed to analyze essay. Please try again.");
@@ -235,7 +294,7 @@ const EditorSuggestions = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Analyzing with AI...</span>
+                <span>Analyzing...</span>
               </div>
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-24 w-full" />

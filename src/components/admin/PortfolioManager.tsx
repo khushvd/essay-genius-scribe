@@ -143,20 +143,20 @@ export const PortfolioManager = () => {
       }
 
       // Show verification status
-      let message = "AI parsing complete! Review and edit the data below.";
+      let message = "Parsing complete! Review and edit the data below.";
       if (data.search_used) {
-        message += " (AI verified names via web search)";
+        message += " (Verified names via web search)";
       }
       if (data.college_id && data.programme_id) {
-        message = "AI parsing complete! College and programme auto-matched in database.";
+        message = "Parsing complete! College and programme auto-matched in database.";
       } else if (data.college_id) {
-        message = "AI parsing complete! College auto-matched. Programme not found in database.";
+        message = "Parsing complete! College auto-matched. Programme not found in database.";
       }
       
       toast.success(message);
     } catch (error: any) {
-      console.error('Error parsing with AI:', error);
-      toast.error(error.message || "Failed to parse with AI");
+      console.error('Error parsing:', error);
+      toast.error(error.message || "Failed to parse");
     } finally {
       setAiParsing(false);
     }
@@ -310,19 +310,19 @@ export const PortfolioManager = () => {
           {aiParsedData && !isEditing && (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              AI Parsed
+              Auto-parsed
             </Badge>
           )}
         </div>
 
-        {/* AI-Powered Upload Section */}
+        {/* Auto-Parse Upload Section */}
         <div className="bg-gradient-subtle rounded-lg p-6 mb-6 border border-border">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-primary" />
-            <h4 className="font-semibold">AI Auto-Parse (Recommended)</h4>
+            <h4 className="font-semibold">Auto-Parse (Recommended)</h4>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Upload documents and let AI automatically extract all the data
+            Upload documents and automatically extract all the data
           </p>
 
           <div className="grid gap-4 md:grid-cols-3 mb-4">
@@ -362,7 +362,7 @@ export const PortfolioManager = () => {
             className="w-full"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            {aiParsing ? "AI Parsing..." : "Parse with AI"}
+            {aiParsing ? "Auto-parsing..." : "Auto-parse"}
           </Button>
         </div>
 
@@ -377,7 +377,7 @@ export const PortfolioManager = () => {
             />
             {aiParsedData && (
               <p className="text-xs text-muted-foreground">
-                AI Suggested: {aiParsedData.college_name} - {aiParsedData.programme_name}
+                Suggested: {aiParsedData.college_name} - {aiParsedData.programme_name}
               </p>
             )}
           </div>

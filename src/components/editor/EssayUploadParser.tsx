@@ -90,7 +90,7 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
         return;
       }
 
-      // Call edge function to parse with AI
+      // Call edge function to parse
       const { data, error } = await supabase.functions.invoke("parse-portfolio-essay", {
         body: { essayContent: extractedText },
       });
@@ -121,7 +121,7 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
 
       onParsed(parsedData);
       
-      const verifiedText = data.search_used ? " (AI verified via web search)" : "";
+      const verifiedText = data.search_used ? " (Verified via web search)" : "";
       toast.success(`Essay parsed successfully!${verifiedText}`);
     } catch (error: any) {
       console.error("Parse error:", error);
@@ -138,7 +138,7 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
           Upload Essay Document
         </Label>
         <p className="text-sm text-muted-foreground mb-3">
-          Upload your essay (PDF or DOCX) and AI will automatically extract the content and metadata
+          Upload your essay (PDF or DOCX) and automatically extract the content and metadata
         </p>
 
         {file ? (
@@ -188,12 +188,12 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
           {parsing ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Parsing with AI...
+              Parsing...
             </>
           ) : (
             <>
               <Upload className="h-4 w-4 mr-2" />
-              Parse Essay with AI
+              Auto-parse Essay
             </>
           )}
         </Button>

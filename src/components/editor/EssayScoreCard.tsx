@@ -137,7 +137,7 @@ export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvDat
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground text-center py-2">
-            Generate an AI score for your essay
+            Generate a score for your essay
           </p>
           <Button 
             onClick={handleGenerateScore} 

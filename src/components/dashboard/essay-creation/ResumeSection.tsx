@@ -40,16 +40,16 @@ export const ResumeSection = ({
     onCvTextChange(text);
     onResumeFileChange(file);
 
-    // Call AI to parse resume and auto-fill questionnaire
+    // Call parser to parse resume and auto-fill questionnaire
     if (text.trim().length >= 50) {
-      toast.info("Parsing resume with AI...");
+      toast.info("Parsing resume...");
       
       const { data, error } = await supabase.functions.invoke('parse-resume', {
         body: { resumeText: text },
       });
 
       if (error) {
-        console.error("AI parsing error:", error);
+        console.error("Parsing error:", error);
         toast.success("Resume uploaded! You can manually fill in the questionnaire below.");
       } else if (data?.parsed_data) {
         const parsed = data.parsed_data;

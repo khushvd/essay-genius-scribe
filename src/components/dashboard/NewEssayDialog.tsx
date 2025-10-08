@@ -298,7 +298,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
         <Tabs value={entryMode} onValueChange={(v) => setEntryMode(v as "manual" | "upload")} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-            <TabsTrigger value="upload">Upload & Parse with AI</TabsTrigger>
+            <TabsTrigger value="upload">Upload & Auto-parse</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upload" className="space-y-4">

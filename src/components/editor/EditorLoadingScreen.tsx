@@ -27,14 +27,14 @@ export const EditorLoadingScreen = ({
   const [messageIndex, setMessageIndex] = useState(0);
   const [hasAnalysis, setHasAnalysis] = useState(false);
 
-  // Smooth progress animation (0-95% over ~50 seconds)
+  // Smooth progress animation (0-95% over ~60 seconds)
   useEffect(() => {
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 95) return 95; // Cap at 95% until analysis completes
-        return prev + 1;
+        return prev + 0.5;
       });
-    }, 500); // Update every 500ms
+    }, 300); // Update every 300ms for smoother animation
 
     return () => clearInterval(progressInterval);
   }, []);
@@ -48,16 +48,19 @@ export const EditorLoadingScreen = ({
     return () => clearInterval(messageInterval);
   }, []);
 
-  // Poll for analysis completion
+  // Poll for analysis completion with immediate first check
   useEffect(() => {
     let pollCount = 0;
-    const maxPolls = 24; // 24 polls * 5 seconds = 2 minutes max
-
-    const pollInterval = setInterval(async () => {
-      pollCount++;
-
+    const maxPolls = 20; // 20 polls * 3 seconds = 60 seconds max
+    
+    const checkAnalysis = async () => {
       try {
-        // Check if any analysis exists for this essay in essay_analytics
+        // Check sessionStorage cache first
+        const contentHash = sessionStorage.getItem(`${essayId}-content-hash`);
+        const cacheKey = contentHash ? `${essayId}-analyzed-${contentHash}` : null;
+        const hasCachedAnalysis = cacheKey ? sessionStorage.getItem(cacheKey) : null;
+
+        // Check if analysis exists in essay_analytics
         const { data, error } = await supabase
           .from("essay_analytics")
           .select("id")
@@ -65,25 +68,42 @@ export const EditorLoadingScreen = ({
           .limit(1)
           .maybeSingle();
 
-        if (!error && data) {
+        if ((!error && data) || hasCachedAnalysis) {
           setHasAnalysis(true);
           setProgress(100);
           
           // Wait a moment to show 100% completion
           setTimeout(() => {
             onAnalysisComplete();
-          }, 800);
-        } else if (pollCount >= maxPolls) {
-          // Timeout after 2 minutes - proceed anyway
-          setProgress(100);
-          setTimeout(() => {
-            onAnalysisComplete();
           }, 500);
+          return true;
         }
+        return false;
       } catch (err) {
         console.error("Error polling for analysis:", err);
+        return false;
       }
-    }, 5000); // Poll every 5 seconds
+    };
+
+    // Run first check immediately
+    checkAnalysis();
+
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+      
+      const completed = await checkAnalysis();
+      
+      if (completed) {
+        clearInterval(pollInterval);
+      } else if (pollCount >= maxPolls) {
+        // Timeout after 60 seconds - proceed anyway
+        setProgress(100);
+        setTimeout(() => {
+          onAnalysisComplete();
+        }, 500);
+        clearInterval(pollInterval);
+      }
+    }, 3000); // Poll every 3 seconds
 
     return () => clearInterval(pollInterval);
   }, [essayId, onAnalysisComplete]);
@@ -148,9 +168,9 @@ export const EditorLoadingScreen = ({
           <div className="bg-card/50 border border-border/50 rounded-lg p-3 flex items-start gap-3">
             <Lightbulb className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium mb-1">AI-Powered Analysis</p>
+              <p className="text-sm font-medium mb-1">Advanced Analysis</p>
               <p className="text-xs text-muted-foreground">
-                Using advanced AI to provide editorial feedback specific to your target college and program
+                Using advanced analysis to provide editorial feedback specific to your target college and program
               </p>
             </div>
           </div>
