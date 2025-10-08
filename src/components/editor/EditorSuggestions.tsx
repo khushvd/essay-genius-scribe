@@ -8,6 +8,17 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SuggestionCard from "./SuggestionCard";
 
+// Generate a simple hash of content for caching
+const generateContentHash = (content: string): string => {
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+};
+
 interface Suggestion {
   id: string;
   type: "critical" | "enhancement" | "personalization";
@@ -52,9 +63,14 @@ const EditorSuggestions = ({
   const [analysisId, setAnalysisId] = useState<string>("");
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
 
-  // Auto-analyze when all required data is loaded
+  // Auto-analyze when all required data is loaded (with caching)
   useEffect(() => {
-    if (!essayId || !content.trim() || content.length < 50 || hasAnalyzed) {
+    if (!essayId || !content.trim() || content.length < 50) {
+      return;
+    }
+
+    // Only auto-analyze if we have no suggestions
+    if (suggestions.length > 0) {
       return;
     }
 
@@ -63,8 +79,18 @@ const EditorSuggestions = ({
       return;
     }
 
+    // Check cache before analyzing
+    const contentHash = generateContentHash(content);
+    const cacheKey = `${essayId}-analyzed-${contentHash}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    
+    if (cached && !hasAnalyzed) {
+      setHasAnalyzed(true);
+      return;
+    }
+
     handleAnalyze();
-  }, [essayId, content, collegeId, programmeId, hasAnalyzed]);
+  }, [essayId, content, collegeId, programmeId, hasAnalyzed, suggestions.length]);
 
   const handleAnalyze = async () => {
     if (!content.trim()) {
@@ -119,6 +145,11 @@ const EditorSuggestions = ({
         toast.success("Your essay looks great! No critical feedback at this time.");
       }
       setHasAnalyzed(true);
+
+      // Cache the analysis result
+      const contentHash = generateContentHash(content);
+      const cacheKey = `${essayId}-analyzed-${contentHash}`;
+      sessionStorage.setItem(cacheKey, 'true');
     } catch (err) {
       console.error('Error calling analyze-essay:', err);
       toast.error("Failed to analyze essay. Please try again.");

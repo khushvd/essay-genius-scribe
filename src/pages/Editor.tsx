@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -14,14 +14,19 @@ import {
   useAutoSave,
   useEssaySuggestions,
 } from "@/features/essay-editor";
+import { EditorLoadingScreen } from "@/components/editor/EditorLoadingScreen";
 
 const Editor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isContentInitialized, setIsContentInitialized] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(
+    searchParams.get("new") === "true"
+  );
 
   // Use custom hooks
   const { essay, loading, error, retry } = useEssayData(id);
@@ -152,6 +157,22 @@ const Editor = () => {
 
   if (!essay) {
     return null;
+  }
+
+  // Show loading screen for new essays
+  if (showLoadingScreen) {
+    return (
+      <EditorLoadingScreen
+        essayId={id!}
+        essayTitle={essay.title}
+        onAnalysisComplete={() => {
+          setShowLoadingScreen(false);
+          // Remove the ?new=true param from URL
+          searchParams.delete("new");
+          setSearchParams(searchParams, { replace: true });
+        }}
+      />
+    );
   }
 
   return (

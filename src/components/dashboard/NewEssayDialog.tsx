@@ -277,7 +277,7 @@ export const NewEssayDialog = ({ open, onOpenChange, userId }: NewEssayDialogPro
 
       toast.success("Essay created successfully!");
       onOpenChange(false);
-      navigate(`/editor/${data.id}`);
+      navigate(`/editor/${data.id}?new=true`);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
