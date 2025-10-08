@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LogOut, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { EssaysOverview } from "@/components/admin/EssaysOverview";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { PortfolioManager } from "@/components/admin/PortfolioManager";
@@ -17,6 +19,34 @@ interface AdminDashboardProps {
 const AdminDashboard = ({ user, profile }: AdminDashboardProps) => {
   const [activeTab, setActiveTab] = useState("essays");
   const { signOut: handleSignOut } = useAuth();
+  const { role, loading: roleLoading } = useUserRole(user?.id);
+
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle">
+        <div className="container mx-auto p-8">
+          <div className="text-center py-12 text-muted-foreground">
+            Verifying permissions...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gradient-subtle">
+        <div className="container mx-auto p-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Access Denied: You don't have admin permissions. If you believe this is an error, please contact support.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-subtle">

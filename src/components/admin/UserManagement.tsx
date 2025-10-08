@@ -28,7 +28,14 @@ export const UserManagement = () => {
       setUsers(result.data);
       setFilteredUsers(result.data);
     } else {
-      toast.error("Failed to load users");
+      console.error('Failed to load users:', result.error);
+      
+      // Check for permission/RLS errors
+      if (result.error.code === 'PGRST301' || result.error.message.includes('row-level security')) {
+        toast.error("Access denied: You don't have admin permissions. Please contact support.");
+      } else {
+        toast.error(`Failed to load users: ${result.error.message}`);
+      }
     }
     setLoading(false);
   };

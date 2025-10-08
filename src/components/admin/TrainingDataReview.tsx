@@ -49,8 +49,14 @@ export const TrainingDataReview = () => {
       .order("added_at", { ascending: false });
 
     if (error) {
-      toast.error("Failed to fetch training data");
-      console.error(error);
+      console.error('Error fetching training data:', error);
+      
+      // Check for RLS policy errors
+      if (error.code === 'PGRST301' || error.message.includes('row-level security')) {
+        toast.error("Access denied: You don't have admin permissions. Please contact support.");
+      } else {
+        toast.error(`Failed to fetch training data: ${error.message}`);
+      }
     } else {
       setEssays(data || []);
     }

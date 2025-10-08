@@ -332,10 +332,11 @@ Provide brief reasoning for the overall score.`;
       }
     }
 
-    // Fetch successful essays only if college and programme are provided
-    let ragContext = 'No specific college/programme context provided. Providing general editorial guidance based on best practices for college essays.';
+    // Fetch successful essays for RAG context
+    let ragContext = '';
     
     if (collegeId && programmeId) {
+      // Specific college and programme - fetch targeted essays
       const { data: successfulEssays, error: essaysError } = await supabase
         .from('successful_essays')
         .select('essay_content, key_strategies, performance_score, writer_resume, writer_questionnaire, essay_title, degree_level')
@@ -364,6 +365,38 @@ ${JSON.stringify(essay.key_strategies, null, 2)}
       } else {
         ragContext = 'No successful essays available for this college and programme combination. Providing general editorial guidance.';
       }
+    } else if (customCollegeName || customProgrammeName) {
+      // Custom college/programme ("Others" selected) - fetch broader context
+      console.log(`[${requestId}] Custom college/programme detected: "${customCollegeName}" / "${customProgrammeName}". Fetching general ${degreeLevel} essays for context.`);
+      
+      const { data: generalEssays, error: essaysError } = await supabase
+        .from('successful_essays')
+        .select('essay_content, key_strategies, performance_score, essay_title, degree_level')
+        .eq('degree_level', degreeLevel)
+        .order('performance_score', { ascending: false })
+        .limit(3);
+      
+      if (essaysError) {
+        console.error(`[${requestId}] Error fetching general essays:`, essaysError);
+      }
+
+      console.log(`[${requestId}] Found ${generalEssays?.length || 0} general essays for custom college context`);
+      
+      if (generalEssays && generalEssays.length > 0) {
+        ragContext = `NOTE: Analyzing essay for "${customCollegeName || 'custom college'}". Using high-performing ${degreeLevel} essays as reference for general best practices:\n\n` + 
+          generalEssays.map((essay, idx) => `
+Example Essay ${idx + 1} (Score: ${essay.performance_score}/100)${essay.essay_title ? ` - "${essay.essay_title}"` : ''}:
+${essay.essay_content.substring(0, 3000)}...
+
+Key Strategies:
+${JSON.stringify(essay.key_strategies, null, 2)}
+`).join('\n\n---\n\n');
+      } else {
+        ragContext = `NOTE: Analyzing essay for custom college "${customCollegeName || 'Not specified'}". No reference essays available. Provide general editorial guidance based on universal ${degreeLevel} essay best practices. Be EXTRA CAREFUL with character positions and ensure all suggestions have precise, valid location data.`;
+      }
+    } else {
+      // No college information at all
+      ragContext = 'No college/programme information provided. Provide general editorial guidance based on best practices. Ensure all character positions are accurate.';
     }
 
     // Build specialized prompt with degree-level specific guidance

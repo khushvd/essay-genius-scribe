@@ -37,11 +37,21 @@ export const EssaysOverview = () => {
         `)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching essays:', error);
+        
+        // Check for RLS policy errors
+        if (error.code === 'PGRST301' || error.message.includes('row-level security')) {
+          toast.error("Access denied: You don't have admin permissions. Please contact support.");
+        } else {
+          toast.error(`Failed to load essays: ${error.message}`);
+        }
+        throw error;
+      }
+      
       setEssays(data || []);
     } catch (error) {
       console.error('Error fetching essays:', error);
-      toast.error("Failed to load essays");
     } finally {
       setLoading(false);
     }
