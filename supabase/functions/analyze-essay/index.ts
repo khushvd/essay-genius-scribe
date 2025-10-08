@@ -73,11 +73,21 @@ async function callGeminiAPI(systemPrompt: string, userPrompt: string, tools: an
 
 function normalizeContent(text: string): string {
   return text
-    .replace(/['']/g, "'")     // Smart single quotes -> straight
-    .replace(/[""]/g, '"')     // Smart double quotes -> straight
+    // Unicode normalization (composed characters)
+    .normalize('NFD').normalize('NFC')
+    // Smart quotes to straight quotes
+    .replace(/['']/g, "'")
+    .replace(/[""]/g, '"')
+    // Dashes
     .replace(/—/g, '-')        // Em dash -> hyphen
     .replace(/–/g, '-')        // En dash -> hyphen
-    .replace(/…/g, '...');     // Ellipsis -> three dots
+    // Ellipsis
+    .replace(/…/g, '...')
+    // Zero-width spaces and other invisible characters
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    // Normalize whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 serve(async (req) => {
@@ -602,7 +612,8 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
       return {
         id: `${Date.now()}-${idx}`,
         ...s,
-        suggestion: cleanSuggestion
+        suggestion: cleanSuggestion,
+        originalText: normalizeContent(s.originalText || '') // Normalize before validation
       };
     });
 
@@ -623,10 +634,11 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
         return false;
       }
 
-      // Verify originalText matches actual content
-      const actualText = essayContent.substring(start, end);
-      if (actualText !== originalText) {
-        console.warn(`[${requestId}] Text mismatch at ${start}-${end}. Expected: "${originalText}", Found: "${actualText}"`);
+      // Verify originalText matches actual content (both normalized)
+      const actualText = normalizeContent(essayContent.substring(start, end));
+      const expectedText = normalizeContent(originalText);
+      if (actualText !== expectedText) {
+        console.warn(`[${requestId}] Text mismatch at ${start}-${end}. Expected: "${expectedText}", Found: "${actualText}"`);
         return false;
       }
 

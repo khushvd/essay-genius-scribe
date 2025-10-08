@@ -1,5 +1,15 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  AlignmentType,
+  HeadingLevel,
+  PageBreak,
+  convertInchesToTwip,
+} from "https://esm.sh/docx@8.5.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,27 +58,137 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Essay not found or access denied");
     }
 
-    // For now, return rich text format (RTF) which Word can open
-    // RTF is simpler than generating proper DOCX and doesn't require external libraries
-    const title = essay.title || "Untitled Essay";
-    const content = essay.content.replace(/\n/g, "\\par\n");
-    
-    const rtfContent = `{\\rtf1\\ansi\\deff0
-{\\fonttbl{\\f0\\fswiss Helvetica;}{\\f1\\froman Times New Roman;}}
-{\\colortbl;\\red0\\green0\\blue0;\\red0\\green0\\blue255;}
-\\f1\\fs24
-{\\b\\fs32 ${title}\\par}
-\\par
-${content}
-\\par
-}`;
+    // Fetch suggestions for editorial feedback section
+    const { data: suggestions } = await supabaseAdmin
+      .from("essay_analytics")
+      .select("*")
+      .eq("essay_id", essayId)
+      .eq("action", "applied")
+      .order("created_at", { ascending: false });
 
-    return new Response(rtfContent, {
+    // Build document sections
+    const title = essay.title || "Untitled Essay";
+    const contentParagraphs = essay.content.split('\n').filter(Boolean);
+
+    const sections = [];
+
+    // Title (14pt, bold, centered)
+    sections.push(
+      new Paragraph({
+        text: title,
+        heading: HeadingLevel.TITLE,
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 240 },
+        style: "Title",
+      })
+    );
+
+    // Essay content paragraphs (12pt, justified, 1.15 spacing)
+    contentParagraphs.forEach((para: string) => {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun(para)],
+          alignment: AlignmentType.JUSTIFIED,
+          spacing: { line: 276, lineRule: "auto" }, // 1.15 line spacing
+        })
+      );
+    });
+
+    // Page break before editorial feedback
+    if (suggestions && suggestions.length > 0) {
+      sections.push(
+        new Paragraph({
+          children: [new PageBreak()],
+        })
+      );
+
+      sections.push(
+        new Paragraph({
+          text: "Editorial Feedback",
+          heading: HeadingLevel.HEADING_1,
+          spacing: { before: 240, after: 120 },
+        })
+      );
+
+      suggestions.forEach((s: any) => {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Original: ", bold: true }),
+              new TextRun(s.original_text || ""),
+            ],
+            spacing: { after: 60 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Suggestion: ", bold: true }),
+              new TextRun(s.suggested_text || ""),
+            ],
+            spacing: { after: 60 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Reason: ", bold: true }),
+              new TextRun(s.reasoning || ""),
+            ],
+            spacing: { after: 120 },
+          })
+        );
+      });
+    }
+
+    // Create DOCX document
+    const doc = new Document({
+      sections: [
+        {
+          properties: {
+            page: {
+              margin: {
+                top: convertInchesToTwip(1),
+                right: convertInchesToTwip(1),
+                bottom: convertInchesToTwip(1),
+                left: convertInchesToTwip(1),
+              },
+            },
+          },
+          children: sections,
+        },
+      ],
+      styles: {
+        default: {
+          document: {
+            run: {
+              font: "Times New Roman",
+              size: 24, // 12pt (half-points)
+            },
+          },
+        },
+        paragraphStyles: [
+          {
+            id: "Title",
+            name: "Title",
+            basedOn: "Normal",
+            run: {
+              font: "Times New Roman",
+              size: 28, // 14pt
+              bold: true,
+            },
+            paragraph: {
+              alignment: AlignmentType.CENTER,
+            },
+          },
+        ],
+      },
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+
+    return new Response(buffer, {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": "application/rtf",
-        "Content-Disposition": `attachment; filename="${essay.title || "essay"}.rtf"`,
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="${essay.title || "essay"}.docx"`,
       },
     });
   } catch (error: any) {

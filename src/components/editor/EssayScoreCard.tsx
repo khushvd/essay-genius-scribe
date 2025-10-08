@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Award, Loader2 } from "lucide-react";
+import { TrendingUp, Award, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 interface EssayScoreCardProps {
   essayId: string;
@@ -21,6 +22,7 @@ export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvDat
   const [latestScore, setLatestScore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [reasoningExpanded, setReasoningExpanded] = useState(false);
 
   const fetchLatestScore = async () => {
     const { data, error } = await supabase
@@ -185,10 +187,16 @@ export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvDat
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="text-center">
-          <div className={`text-4xl font-bold ${getScoreColor(latestScore.overall_score || 0)}`}>
+          <button
+            onClick={() => setReasoningExpanded(!reasoningExpanded)}
+            className={`text-4xl font-bold ${getScoreColor(latestScore.overall_score || 0)} cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center gap-2 mx-auto`}
+          >
             {latestScore.overall_score || 0}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">Overall Score</p>
+            {latestScore.ai_reasoning && (
+              reasoningExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />
+            )}
+          </button>
+          <p className="text-xs text-muted-foreground mt-1">Overall Score {latestScore.ai_reasoning && '(click to expand)'}</p>
         </div>
 
         {latestScore.clarity_score && (
@@ -231,11 +239,11 @@ export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvDat
           </div>
         )}
 
-        {latestScore.ai_reasoning && (
+        {latestScore.ai_reasoning && reasoningExpanded && (
           <div className="pt-3 border-t border-border">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {latestScore.ai_reasoning}
-            </p>
+            <div className="text-xs text-muted-foreground leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown>{latestScore.ai_reasoning}</ReactMarkdown>
+            </div>
           </div>
         )}
 

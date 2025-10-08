@@ -92,7 +92,7 @@ const Editor = () => {
       const title = sanitizeFilename(essay.title);
       const filename = `${collegeName}_${programmeName}_${title}`.replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
 
-      a.download = `${filename}.rtf`;
+      a.download = `${filename}.docx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -109,7 +109,7 @@ const Editor = () => {
         // Don't show error to user - export succeeded
       }
 
-      toast.success("Essay exported as RTF (opens in Word)");
+      toast.success("Essay exported as DOCX");
     } catch (error) {
       console.error("Export error:", error);
       toast.error("Failed to export essay");
@@ -183,8 +183,8 @@ const Editor = () => {
         </div>
 
         {/* Desktop: Side Panel */}
-        <div className="w-[400px] hidden lg:block overflow-auto border-l border-border">
-          <div className="p-4 sticky top-0">
+        <div className="w-[400px] hidden lg:flex flex-col border-l border-border overflow-y-auto">
+          <div className="p-4">
             <SuggestionsPanel
               suggestions={suggestions}
               essayId={id!}
