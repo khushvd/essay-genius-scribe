@@ -4,6 +4,23 @@ import { analyticsService } from '@/services/analytics.service';
 import { toast } from 'sonner';
 import type { EssaySuggestion } from '@/types/entities';
 
+// Normalize text to handle Unicode differences (mirrors server normalization)
+const normalizeClient = (text: string): string => {
+  return text
+    .normalize('NFD').normalize('NFC')
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/[\u2010-\u2015]/g, '-')
+    .replace(/—/g, '-')
+    .replace(/–/g, '-')
+    .replace(/…/g, '...')
+    .replace(/\.\.\.\./g, '...')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 interface UseEssaySuggestionsResult {
   suggestions: EssaySuggestion[];
   appliedSuggestions: Set<string>;
@@ -25,10 +42,11 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
       const { start, end } = suggestion.location;
       const { suggestion: suggestedText, originalText } = suggestion;
 
-      // Validate that the original text still exists at the specified location
+      // Validate that the original text still exists at the specified location (with normalization)
       const currentText = content.substring(start, end);
-
-      if (currentText !== originalText) {
+      
+      // Use normalized comparison to handle Unicode differences
+      if (normalizeClient(currentText) !== normalizeClient(originalText)) {
         toast.error('Cannot apply suggestion - the text has changed');
         return;
       }

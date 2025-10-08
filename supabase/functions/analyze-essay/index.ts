@@ -73,19 +73,23 @@ async function callGeminiAPI(systemPrompt: string, userPrompt: string, tools: an
 
 function normalizeContent(text: string): string {
   return text
-    // Unicode normalization (composed characters)
+    // Unicode normalization (handle composed characters)
     .normalize('NFD').normalize('NFC')
-    // Smart quotes to straight quotes
-    .replace(/['']/g, "'")
-    .replace(/[""]/g, '"')
-    // Dashes
-    .replace(/—/g, '-')        // Em dash -> hyphen
-    .replace(/–/g, '-')        // En dash -> hyphen
+    // Smart/curly quotes to straight quotes
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")  // All variants of single quotes
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')  // All variants of double quotes
+    // Various dashes and hyphens
+    .replace(/[\u2010-\u2015]/g, '-')  // Various dashes and hyphens
+    .replace(/—/g, '-')  // Em dash
+    .replace(/–/g, '-')  // En dash
     // Ellipsis
     .replace(/…/g, '...')
+    .replace(/\.\.\.\./g, '...') // Normalize multiple dots
+    // Non-breaking space to regular space
+    .replace(/\u00A0/g, ' ')
     // Zero-width spaces and other invisible characters
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    // Normalize whitespace
+    // Normalize all whitespace (including tabs, newlines, etc.)
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -617,31 +621,15 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
       };
     });
 
-    // Validate suggestion positions
+    // Validate suggestion positions (bounds-only, no text matching)
     const validateSuggestion = (s: any, essayContent: string): boolean => {
-      const { location, originalText } = s;
-      const { start, end } = location;
-
-      // Check positions are within bounds
-      if (start < 0 || end > essayContent.length) {
-        console.warn(`[${requestId}] Invalid suggestion position: start=${start}, end=${end}, length=${essayContent.length}`);
+      const { start, end } = s.location;
+      
+      if (start < 0 || end > essayContent.length || start >= end) {
+        console.warn(`[${requestId}] Invalid bounds: start=${start}, end=${end}, length=${essayContent.length}`);
         return false;
       }
-
-      // Check start < end
-      if (start >= end) {
-        console.warn(`[${requestId}] Invalid suggestion range: start=${start} >= end=${end}`);
-        return false;
-      }
-
-      // Verify originalText matches actual content (both normalized)
-      const actualText = normalizeContent(essayContent.substring(start, end));
-      const expectedText = normalizeContent(originalText);
-      if (actualText !== expectedText) {
-        console.warn(`[${requestId}] Text mismatch at ${start}-${end}. Expected: "${expectedText}", Found: "${actualText}"`);
-        return false;
-      }
-
+      
       return true;
     };
 
