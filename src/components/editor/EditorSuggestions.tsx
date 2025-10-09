@@ -66,57 +66,43 @@ const EditorSuggestions = ({
 
   // Check for existing analysis on mount
   useEffect(() => {
-    const loadExistingAnalysis = async () => {
+    const loadCachedAnalysis = () => {
       if (!essayId || suggestions.length > 0) return;
 
-      // Check cache first
-      const contentHash = generateContentHash(content);
-      const cacheKey = `${essayId}-analyzed-${contentHash}`;
+      // Check sessionStorage cache
+      const cacheKey = `essay_analysis_${essayId}`;
       const cached = sessionStorage.getItem(cacheKey);
-
+      
       if (cached) {
-        // Try to load suggestions from database
         try {
-          const { data, error } = await supabase
-            .from('essay_analytics')
-            .select('*')
-            .eq('essay_id', essayId)
-            .order('created_at', { ascending: false })
-            .limit(50);
-
-          if (!error && data && data.length > 0) {
-            // Group by suggestion_id and reconstruct suggestions
-            const suggestionMap = new Map();
-            data.forEach((record) => {
-              if (!suggestionMap.has(record.suggestion_id)) {
-                suggestionMap.set(record.suggestion_id, {
-                  id: record.suggestion_id,
-                  type: record.suggestion_type,
-                  originalText: record.original_text || '',
-                  suggestion: record.suggested_text || '',
-                  reasoning: record.reasoning || '',
-                  issue: '',
-                  evidence: '',
-                  location: { start: 0, end: 0 }
-                });
-              }
-            });
-
-            const loadedSuggestions = Array.from(suggestionMap.values());
-            if (loadedSuggestions.length > 0) {
-              onSuggestionsUpdate?.(loadedSuggestions);
+          const cacheData = JSON.parse(cached);
+          const cacheAge = Date.now() - cacheData.timestamp;
+          
+          // Cache valid for 30 minutes
+          if (cacheAge < 30 * 60 * 1000 && cacheData.suggestions && cacheData.contentHash) {
+            // Compare content hash to see if essay changed
+            const currentHash = generateContentHash(content);
+            
+            if (currentHash === cacheData.contentHash) {
+              console.log('Restoring cached suggestions - content unchanged');
+              onSuggestionsUpdate?.(cacheData.suggestions);
               setHasAnalyzed(true);
+              setAnalysisId(cacheData.analysisId || '');
               return;
+            } else {
+              console.log('Content changed since last analysis - cache invalidated');
+              sessionStorage.removeItem(cacheKey);
             }
           }
-        } catch (err) {
-          console.error('Error loading existing analysis:', err);
+        } catch (error) {
+          console.error('Error loading cached analysis:', error);
+          sessionStorage.removeItem(cacheKey);
         }
       }
     };
 
-    loadExistingAnalysis();
-  }, [essayId]);
+    loadCachedAnalysis();
+  }, [essayId, suggestions.length, content]);
 
   // Auto-analyze when all required data is loaded (with caching)
   useEffect(() => {
@@ -135,13 +121,23 @@ const EditorSuggestions = ({
     }
 
     // Check cache before analyzing
-    const contentHash = generateContentHash(content);
-    const cacheKey = `${essayId}-analyzed-${contentHash}`;
+    const cacheKey = `essay_analysis_${essayId}`;
     const cached = sessionStorage.getItem(cacheKey);
     
     if (cached) {
-      setHasAnalyzed(true);
-      return;
+      try {
+        const cacheData = JSON.parse(cached);
+        const currentHash = generateContentHash(content);
+        
+        // Only skip if content hasn't changed
+        if (cacheData.contentHash === currentHash) {
+          setHasAnalyzed(true);
+          return;
+        }
+      } catch (e) {
+        // Invalid cache, continue with analysis
+        sessionStorage.removeItem(cacheKey);
+      }
     }
 
     handleAnalyze();
@@ -200,15 +196,15 @@ const EditorSuggestions = ({
       }
       setHasAnalyzed(true);
 
-      // Cache the analysis result with timestamp and count
+      // Store full suggestions in session cache with content hash
+      const cacheKey = `essay_analysis_${essayId}`;
       const contentHash = generateContentHash(content);
-      const cacheKey = `${essayId}-analyzed-${contentHash}`;
       sessionStorage.setItem(cacheKey, JSON.stringify({
         timestamp: Date.now(),
-        count: data?.suggestions?.length || 0
+        suggestions: data?.suggestions || [],
+        contentHash,
+        analysisId: data.analysisId
       }));
-      // Store content hash for loading screen
-      sessionStorage.setItem(`${essayId}-content-hash`, contentHash);
     } catch (err) {
       console.error('Error calling analyze-essay:', err);
       toast.error("Failed to analyze essay. Please try again.");

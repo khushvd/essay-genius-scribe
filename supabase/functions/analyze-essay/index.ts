@@ -226,7 +226,18 @@ Score the essay on these dimensions (0-100 each):
 4. Authenticity - genuine voice and personal insight
 5. Coherence - logical flow and connection between ideas
 
-Provide brief reasoning for the overall score.`;
+IMPORTANT SCORING GUIDELINES:
+- BE DECISIVE: Avoid defaulting to middle scores (65-75 range). Differentiate clearly between quality levels.
+- Use the full scale: 
+  * 40-55 = Needs significant work (unclear, generic, or unfocused)
+  * 56-65 = Needs improvement (has potential but major issues remain)
+  * 66-74 = Good foundation (solid but needs refinement)
+  * 75-84 = Strong essay (clear voice, impactful, mostly polished)
+  * 85-95 = Exceptional (compelling, authentic, memorable)
+- Justify scores with specific evidence from the essay
+- Don't anchor to "safe" middle scores - assess honestly based on actual quality
+
+Provide detailed reasoning for the overall score with specific examples.`;
 
       try {
         // Use the same model selection logic as feedback
@@ -699,7 +710,19 @@ Rate the essay on:
 4. Authenticity of voice (0-100)
 5. Coherence and structure (0-100)
 
-Provide detailed reasoning for each score.`;
+IMPORTANT SCORING GUIDELINES:
+- BE DECISIVE: Avoid defaulting to middle scores (65-75 range). Use the full spectrum based on actual quality.
+- Score distribution examples:
+  * 40-55 = Needs significant work (multiple major issues, unclear purpose)
+  * 56-65 = Needs improvement (has potential but lacks polish or focus)
+  * 66-74 = Good foundation (solid content but needs refinement in execution)
+  * 75-84 = Strong essay (clear, impactful, well-crafted with minor areas to improve)
+  * 85-95 = Exceptional (compelling narrative, authentic voice, memorable and polished)
+- Base scores on concrete evidence from the essay, not assumptions
+- Consider the feedback severity: many critical issues = lower score; mostly enhancements = higher score
+- Don't anchor to "72" or any other middle value - assess objectively
+
+Provide detailed reasoning with specific examples from the essay to justify each score.`;
 
     try {
       const scoreResponse = useClaude && !usingFallback

@@ -23,6 +23,7 @@ export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvDat
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const fetchLatestScore = async () => {
     const { data, error } = await supabase
@@ -35,14 +36,42 @@ export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvDat
 
     if (!error && data) {
       setLatestScore(data);
+      setLoading(false);
+      return true;
     }
-    setLoading(false);
+    return false;
   };
 
   useEffect(() => {
-    fetchLatestScore();
+    let mounted = true;
+    let retryTimeout: NodeJS.Timeout;
 
-    // Subscribe to score updates
+    const fetchWithRetry = async () => {
+      const found = await fetchLatestScore();
+      
+      // If no score found and we haven't retried too many times, retry after delay
+      if (!found && mounted && retryCount < 3) {
+        const delay = (retryCount + 1) * 2000; // 2s, 4s, 6s
+        console.log(`No score found, retrying in ${delay}ms (attempt ${retryCount + 1}/3)`);
+        retryTimeout = setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+        }, delay);
+      } else {
+        setLoading(false);
+      }
+    };
+
+    fetchWithRetry();
+
+    return () => {
+      mounted = false;
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
+  }, [essayId, retryCount]);
+
+  useEffect(() => {
+    // Subscribe to score updates (after initial fetch attempt)
+
     const channel = supabase
       .channel(`essay_scores_${essayId}`)
       .on(
