@@ -102,7 +102,7 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
       console.error('Error applying suggestion:', error);
       toast.error('Failed to apply suggestion');
     }
-  }, [essayId]);
+  }, [essayId, suggestions]);
 
   const dismissSuggestion = useCallback((suggestionId: string) => {
     setAppliedSuggestions(prev => new Set(prev).add(suggestionId));

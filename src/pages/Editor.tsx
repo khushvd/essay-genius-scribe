@@ -218,6 +218,7 @@ const Editor = () => {
               programmeName={essay.programmes?.name}
               onApply={handleApplySuggestion}
               onSuggestionsUpdate={setSuggestions}
+              appliedSuggestions={appliedSuggestions}
             />
           </div>
         </div>
@@ -244,6 +245,7 @@ const Editor = () => {
                 programmeName={essay.programmes?.name}
                 onApply={handleApplySuggestion}
                 onSuggestionsUpdate={setSuggestions}
+                appliedSuggestions={appliedSuggestions}
               />
             </div>
           </DrawerContent>

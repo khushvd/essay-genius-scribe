@@ -13,6 +13,7 @@ interface SuggestionsPanelProps {
   programmeName?: string;
   onApply: (suggestion: any) => void;
   onSuggestionsUpdate: (suggestions: any[]) => void;
+  appliedSuggestions: Set<string>;
 }
 
 export const SuggestionsPanel = ({
@@ -27,6 +28,7 @@ export const SuggestionsPanel = ({
   programmeName,
   onApply,
   onSuggestionsUpdate,
+  appliedSuggestions,
 }: SuggestionsPanelProps) => {
   return (
     <div className="space-y-4">
@@ -50,6 +52,7 @@ export const SuggestionsPanel = ({
         collegeName={collegeName}
         programmeName={programmeName}
         onSuggestionsUpdate={onSuggestionsUpdate}
+        appliedSuggestions={appliedSuggestions}
       />
     </div>
   );

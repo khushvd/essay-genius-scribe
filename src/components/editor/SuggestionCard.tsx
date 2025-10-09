@@ -89,13 +89,6 @@ const SuggestionCard = ({ suggestion, onApply, onDismiss, isApplied }: Suggestio
           <p><span className="font-semibold">Why:</span> {suggestion.reasoning}</p>
           <p><span className="font-semibold">Evidence:</span> {suggestion.evidence}</p>
         </div>
-
-        {isApplied && (
-          <div className="text-xs text-primary font-medium flex items-center gap-1">
-            <Check className="w-3 h-3" />
-            Applied
-          </div>
-        )}
       </div>
     </Card>
   );

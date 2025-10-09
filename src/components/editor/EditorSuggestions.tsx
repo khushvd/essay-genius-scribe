@@ -42,6 +42,7 @@ interface EditorSuggestionsProps {
   collegeName?: string;
   programmeName?: string;
   onSuggestionsUpdate?: (suggestions: Suggestion[]) => void;
+  appliedSuggestions: Set<string>;
 }
 
 const EditorSuggestions = ({
@@ -56,9 +57,9 @@ const EditorSuggestions = ({
   collegeName,
   programmeName,
   onSuggestionsUpdate,
+  appliedSuggestions,
 }: EditorSuggestionsProps) => {
   const [analyzing, setAnalyzing] = useState(false);
-  const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [analysisId, setAnalysisId] = useState<string>("");
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
@@ -160,7 +161,6 @@ const EditorSuggestions = ({
     }
 
     setAnalyzing(true);
-    setAppliedSuggestions(new Set());
     setLastAnalysisTime(now);
 
     try {
@@ -219,8 +219,9 @@ const EditorSuggestions = ({
 
   const handleApply = async (suggestion: Suggestion) => {
     onApplySuggestion(suggestion);
-    setAppliedSuggestions((prev) => new Set([...prev, suggestion.id]));
-    toast.success("Suggestion applied");
+    
+    // Remove from suggestions list
+    onSuggestionsUpdate?.(suggestions.filter((s) => s.id !== suggestion.id));
 
     // Track analytics
     await trackSuggestionAction(suggestion, 'applied');
