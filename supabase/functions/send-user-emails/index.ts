@@ -34,29 +34,44 @@ const handler = async (req: Request): Promise<Response> => {
     switch (type) {
       case "invite":
         subject = "Welcome to Sandwich Essay Platform";
+        const appUrl = "https://editor.sandwichglobal.com";
+        const loginUrl = `${appUrl}/auth?email=${encodeURIComponent(recipientEmail)}`;
         html = `
           <h1>Welcome to Sandwich Essay Platform!</h1>
           <p>Hello ${recipientName || "there"},</p>
-          <p>An administrator has created an account for you on our platform.</p>
+          <p>An administrator has created an account for you on our platform. Your account is ready to use!</p>
           <p><strong>Your login credentials:</strong></p>
           <ul>
-            <li>Email: ${recipientEmail}</li>
-            <li>Temporary Password: ${temporaryPassword}</li>
+            <li><strong>Email:</strong> ${recipientEmail}</li>
+            <li><strong>Temporary Password:</strong> <code style="background: #f4f4f4; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${temporaryPassword}</code></li>
           </ul>
-          <p>Please log in and change your password as soon as possible.</p>
-          <p><a href="${Deno.env.get("SUPABASE_URL")?.replace("/v1", "")}/auth">Log in to your account</a></p>
+          <p>Click the button below to log in (your email will be pre-filled):</p>
+          <p style="margin: 30px 0;">
+            <a href="${loginUrl}" 
+               style="background: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+              Log in to your account
+            </a>
+          </p>
+          <p style="color: #666; font-size: 14px;">Or copy this link: <a href="${loginUrl}">${loginUrl}</a></p>
+          <p><strong>Important:</strong> Please change your password after your first login for security.</p>
           <p>Best regards,<br>The Sandwich Essay Team</p>
         `;
         break;
 
       case "approval":
         subject = "Your Account Has Been Approved";
+        const dashboardUrl = "https://editor.sandwichglobal.com/auth";
         html = `
           <h1>Account Approved!</h1>
           <p>Hello ${recipientName || "there"},</p>
           <p>Great news! Your account has been approved by ${adminName || "an administrator"}.</p>
           <p>You can now access all features of the Sandwich Essay Platform.</p>
-          <p><a href="${Deno.env.get("SUPABASE_URL")?.replace("/v1", "")}/dashboard">Go to Dashboard</a></p>
+          <p style="margin: 30px 0;">
+            <a href="${dashboardUrl}" 
+               style="background: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+              Log in to your account
+            </a>
+          </p>
           <p>Best regards,<br>The Sandwich Essay Team</p>
         `;
         break;
@@ -87,6 +102,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       case "admin_notification":
         subject = "New User Signup - Action Required";
+        const adminDashboardUrl = "https://editor.sandwichglobal.com/dashboard";
         html = `
           <h1>New User Signup</h1>
           <p>A new user has signed up and requires approval:</p>
@@ -95,7 +111,12 @@ const handler = async (req: Request): Promise<Response> => {
             <li><strong>Email:</strong> ${recipientEmail}</li>
           </ul>
           <p>Please log in to the admin dashboard to review and approve this account.</p>
-          <p><a href="${Deno.env.get("SUPABASE_URL")?.replace("/v1", "")}/dashboard">Go to Admin Dashboard</a></p>
+          <p style="margin: 30px 0;">
+            <a href="${adminDashboardUrl}" 
+               style="background: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+              Go to Admin Dashboard
+            </a>
+          </p>
         `;
 
         // Send to all admin emails
