@@ -81,21 +81,23 @@ serve(async (req) => {
       );
     }
 
-    // Profile is created by trigger, update account_status
-    // Admins are auto-approved, others need approval
-    if (role === 'admin') {
-      const { error: updateError } = await supabaseAdmin
-        .from('profiles')
-        .update({ 
-          account_status: 'approved',
-          approved_by: user.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', newUser.user.id);
+    console.log('User created successfully:', newUser.user.id, 'Role:', role);
 
-      if (updateError) {
-        console.error('Error updating profile status:', updateError);
-      }
+    // Auto-approve ALL admin-created users (admins, free, premium)
+    // They were invited by an admin, so no approval needed
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({ 
+        account_status: 'approved',
+        approved_by: user.id,
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', newUser.user.id);
+
+    if (updateError) {
+      console.error('Error updating profile status:', updateError);
+    } else {
+      console.log('Profile auto-approved for user:', newUser.user.id);
     }
 
     // Assign role (use UPSERT to prevent duplicate key errors)
@@ -115,6 +117,8 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log('Role assigned successfully:', role, 'for user:', newUser.user.id);
 
     // Create audit log entry for admin user creation
     if (role === 'admin') {
@@ -139,8 +143,9 @@ serve(async (req) => {
     }
 
     // Send invite email
+    console.log('Attempting to send invite email to:', email);
     try {
-      await supabaseAdmin.functions.invoke('send-user-emails', {
+      const emailResponse = await supabaseAdmin.functions.invoke('send-user-emails', {
         body: {
           type: 'invite',
           recipientEmail: email,
@@ -148,6 +153,12 @@ serve(async (req) => {
           temporaryPassword: password,
         }
       });
+      
+      if (emailResponse.error) {
+        console.error('Email function returned error:', emailResponse.error);
+      } else {
+        console.log('Invite email sent successfully:', emailResponse.data);
+      }
     } catch (emailError) {
       console.error('Error sending invite email:', emailError);
       // Don't fail if email doesn't send
