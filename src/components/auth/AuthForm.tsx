@@ -24,16 +24,14 @@ export const AuthForm = () => {
     setLoading(true);
 
     try {
-      // Validate input
-      const validationData = isLogin 
-        ? { email, password }
-        : { email, password, fullName };
-      
-      const parsed = authValidationSchema.safeParse(validationData);
-      if (!parsed.success) {
-        toast.error(parsed.error.errors[0].message);
-        setLoading(false);
-        return;
+      // Only validate signup - login is handled server-side
+      if (!isLogin) {
+        const parsed = authValidationSchema.safeParse({ email, password, fullName });
+        if (!parsed.success) {
+          toast.error(parsed.error.errors[0].message);
+          setLoading(false);
+          return;
+        }
       }
 
       if (isLogin) {
@@ -131,7 +129,7 @@ export const AuthForm = () => {
                   </Button>
                 )}
               </div>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={10} />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={isLogin ? undefined : 10} />
               {!isLogin && (
                 <p className="text-xs text-muted-foreground">
                   Must be at least 10 characters with uppercase, lowercase, number, and special character

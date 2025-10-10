@@ -104,14 +104,14 @@ export const AddUserDialog = ({ open, onOpenChange, onUserAdded }: AddUserDialog
               <Input
                 id="password"
                 type="password"
-                placeholder="Min. 6 characters"
+                placeholder="Min. 10 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
+                minLength={10}
                 required
               />
               <p className="text-xs text-muted-foreground">
-                User will be able to change this on first login
+                Must be 10+ chars with uppercase, lowercase, number, and special character
               </p>
             </div>
           </div>
