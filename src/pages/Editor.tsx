@@ -13,6 +13,7 @@ import {
   useEssayData,
   useAutoSave,
   useEssaySuggestions,
+  useTrainingSnapshot,
 } from "@/features/essay-editor";
 import { EditorLoadingScreen } from "@/components/editor/EditorLoadingScreen";
 
@@ -21,6 +22,7 @@ const Editor = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [content, setContent] = useState("");
+  const [originalContent, setOriginalContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isContentInitialized, setIsContentInitialized] = useState(false);
@@ -44,9 +46,16 @@ const Editor = () => {
   useEffect(() => {
     if (essay && !isContentInitialized) {
       setContent(essay.content || "");
+      setOriginalContent(essay.content || "");
       setIsContentInitialized(true);
     }
   }, [essay, isContentInitialized]);
+
+  const { submitForTraining, isSubmitting: isSubmittingTraining } = useTrainingSnapshot({
+    essayId: id!,
+    originalContent,
+    currentContent: content,
+  });
 
   const handleSave = async () => {
     setSaving(true);
@@ -182,10 +191,12 @@ const Editor = () => {
         isSaving={isSaving}
         lastSaved={lastSaved}
         saving={saving}
-        onBack={() => navigate("/dashboard")}
-        onSave={handleSave}
-        onExport={handleExportAsWord}
-      />
+          onBack={() => navigate("/dashboard")}
+          onSave={handleSave}
+          onExport={handleExportAsWord}
+          onSubmitTraining={submitForTraining}
+          isSubmittingTraining={isSubmittingTraining}
+        />
 
       <main className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-auto">

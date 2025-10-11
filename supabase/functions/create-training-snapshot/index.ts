@@ -43,10 +43,16 @@ const handler = async (req: Request): Promise<Response> => {
       manualEdits 
     } = await req.json();
 
-    // Fetch essay to verify ownership
+    // Fetch essay and writer profile to verify ownership
     const { data: essay, error: essayError } = await supabaseAdmin
       .from("essays")
-      .select("*")
+      .select(`
+        *,
+        profiles!essays_writer_id_fkey(
+          full_name,
+          email
+        )
+      `)
       .eq("id", essayId)
       .eq("writer_id", user.id)
       .single();
@@ -86,6 +92,8 @@ const handler = async (req: Request): Promise<Response> => {
       degree_level: essay.degree_level,
       custom_college_name: essay.custom_college_name,
       custom_programme_name: essay.custom_programme_name,
+      writer_name: essay.profiles?.full_name || "Unknown",
+      writer_email: essay.profiles?.email || "N/A",
       // Keep only non-PII questionnaire data
       questionnaire_data: essay.questionnaire_data ? {
         hasWorkExperience: essay.questionnaire_data.hasWorkExperience,

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
+import { BulkUploadDialog } from "./BulkUploadDialog";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -24,6 +25,7 @@ export const PortfolioManager = () => {
   const [essayFile, setEssayFile] = useState<File | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     college_id: "",
@@ -299,8 +301,15 @@ export const PortfolioManager = () => {
   };
 
   return (
+    <>
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold font-serif">Portfolio Management</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold font-serif">Portfolio Management</h2>
+        <Button onClick={() => setBulkUploadOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          Bulk Upload
+        </Button>
+      </div>
 
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
@@ -565,5 +574,12 @@ export const PortfolioManager = () => {
         </div>
       </Card>
     </div>
+    
+    <BulkUploadDialog
+      open={bulkUploadOpen}
+      onOpenChange={setBulkUploadOpen}
+      onSuccess={fetchData}
+    />
+    </>
   );
 };

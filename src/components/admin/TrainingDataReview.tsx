@@ -24,6 +24,8 @@ interface TrainingEssay {
   admin_notes: string;
   metadata: any;
   essays?: {
+    id?: string;
+    title?: string;
     colleges?: { id: string; name: string } | null;
     programmes?: { id: string; name: string } | null;
   };
@@ -41,7 +43,9 @@ export const TrainingDataReview = () => {
       .from("training_essays")
       .select(`
         *,
-        essays!inner(
+        essays(
+          id,
+          title,
           colleges(id, name),
           programmes(id, name)
         )
@@ -188,10 +192,11 @@ export const TrainingDataReview = () => {
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <CardTitle className="text-lg">
-                        {essay.metadata?.title || "Untitled Essay"}
+                        {essay.essays?.title || essay.metadata?.title || "Untitled Essay"}
                       </CardTitle>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>{new Date(essay.added_at).toLocaleDateString()}</span>
+                        <span>• Writer: {essay.metadata?.writer_name || "Unknown"}</span>
                         {improvement !== null && (
                           <Badge variant="outline" className={improvement > 0 ? "text-success" : ""}>
                             {improvement > 0 ? "+" : ""}{improvement} points

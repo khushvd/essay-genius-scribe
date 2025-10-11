@@ -12,6 +12,8 @@ interface EditorHeaderProps {
   onBack: () => void;
   onSave: () => void;
   onExport: () => void;
+  onSubmitTraining?: () => void;
+  isSubmittingTraining?: boolean;
 }
 
 export const EditorHeader = ({
@@ -22,6 +24,8 @@ export const EditorHeader = ({
   onBack,
   onSave,
   onExport,
+  onSubmitTraining,
+  isSubmittingTraining,
 }: EditorHeaderProps) => {
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -57,6 +61,16 @@ export const EditorHeader = ({
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
+            {onSubmitTraining && (
+              <Button 
+                onClick={onSubmitTraining} 
+                variant="outline" 
+                size="sm"
+                disabled={isSubmittingTraining}
+              >
+                {isSubmittingTraining ? "Submitting..." : "Submit for Training"}
+              </Button>
+            )}
             <Button onClick={onSave} disabled={saving}>
               <Save className="w-4 h-4 mr-2" />
               {saving ? "Saving..." : "Save"}
