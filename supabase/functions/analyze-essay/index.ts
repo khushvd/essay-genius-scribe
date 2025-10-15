@@ -45,10 +45,24 @@ async function callClaudeAPI(systemPrompt: string, userPrompt: string, tools: an
 }
 
 // Helper function to call Gemini API via Lovable AI Gateway
-async function callGeminiAPI(systemPrompt: string, userPrompt: string, tools: any[]) {
+async function callGeminiAPI(systemPrompt: string, userPrompt: string, tools: any[], requiredTool?: string) {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) {
     throw new Error('LOVABLE_API_KEY not configured');
+  }
+
+  const requestBody: any = {
+    model: 'google/gemini-2.5-flash',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    tools: tools,
+  };
+
+  // Only add tool_choice if requiredTool is specified
+  if (requiredTool) {
+    requestBody.tool_choice = { type: 'function', function: { name: requiredTool } };
   }
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -57,15 +71,7 @@ async function callGeminiAPI(systemPrompt: string, userPrompt: string, tools: an
       'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      tools: tools,
-      tool_choice: { type: 'function', function: { name: 'provide_editorial_feedback' } }
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   return response;
@@ -284,7 +290,7 @@ Provide detailed reasoning for the overall score with specific examples.`;
                 required: ['overall_score', 'clarity_score', 'impact_score', 'authenticity_score', 'coherence_score', 'reasoning']
               }
             }
-          }]);
+          }], 'score_essay');
         }
 
         if (!scoreResponse.ok) {
@@ -586,19 +592,19 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
           console.warn(`[${requestId}] Claude API failed, falling back to Gemini:`, aiResponse.status);
           usingFallback = true;
           modelUsed = 'gemini-2.5-flash (fallback)';
-          aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+          aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools, 'provide_editorial_feedback');
         } else {
           modelUsed = 'claude-sonnet-4';
         }
       } else {
-        aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+        aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools, 'provide_editorial_feedback');
         modelUsed = 'gemini-2.5-flash';
       }
     } catch (error) {
       console.error(`[${requestId}] Primary AI call failed, attempting fallback:`, error);
       usingFallback = true;
       modelUsed = 'gemini-2.5-flash (fallback)';
-      aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools);
+      aiResponse = await callGeminiAPI(systemPrompt, userPrompt, tools, 'provide_editorial_feedback');
     }
 
     if (!aiResponse.ok) {

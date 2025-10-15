@@ -115,11 +115,6 @@ const EditorSuggestions = ({
       return;
     }
 
-    // Wait for collegeId to load before analyzing
-    if (!collegeId) {
-      return;
-    }
-
     // Check cache before analyzing
     const cacheKey = `essay_analysis_${essayId}`;
     const cached = sessionStorage.getItem(cacheKey);
