@@ -686,21 +686,41 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
     const validatedSuggestions = suggestionsWithIds.filter((s: any) => validateSuggestion(s, normalizedContent));
     console.log(`[${requestId}] Filtered ${suggestionsWithIds.length - validatedSuggestions.length} invalid suggestions`);
 
-    // Deduplicate suggestions by location
-    const seenLocations = new Set<string>();
+    // Deduplicate and remove overlapping suggestions
+    const acceptedSuggestions: any[] = [];
     const deduplicatedSuggestions = validatedSuggestions.filter((s: any) => {
-      const locationKey = `${s.location.start}-${s.location.end}`;
+      const { start: currentStart, end: currentEnd } = s.location;
       
-      if (seenLocations.has(locationKey)) {
-        console.log(`[${requestId}] Skipping duplicate suggestion at ${locationKey}`);
-        return false;
+      // Check if this suggestion overlaps with any already-accepted suggestion
+      for (const existing of acceptedSuggestions) {
+        const { start: existingStart, end: existingEnd } = existing.location;
+        
+        // Check for overlap:
+        // 1. Current is fully contained within existing
+        if (currentStart >= existingStart && currentEnd <= existingEnd) {
+          console.log(`[${requestId}] Skipping suggestion ${currentStart}-${currentEnd} (contained in ${existingStart}-${existingEnd})`);
+          return false;
+        }
+        
+        // 2. Existing is fully contained within current
+        if (existingStart >= currentStart && existingEnd <= currentEnd) {
+          console.log(`[${requestId}] Skipping suggestion ${currentStart}-${currentEnd} (contains ${existingStart}-${existingEnd})`);
+          return false;
+        }
+        
+        // 3. Partial overlap (any overlap at all)
+        if (currentStart < existingEnd && currentEnd > existingStart) {
+          console.log(`[${requestId}] Skipping suggestion ${currentStart}-${currentEnd} (overlaps with ${existingStart}-${existingEnd})`);
+          return false;
+        }
       }
       
-      seenLocations.add(locationKey);
+      // No overlap detected, accept this suggestion
+      acceptedSuggestions.push(s);
       return true;
     });
 
-    console.log(`[${requestId}] Removed ${validatedSuggestions.length - deduplicatedSuggestions.length} duplicate suggestions`);
+    console.log(`[${requestId}] Removed ${validatedSuggestions.length - deduplicatedSuggestions.length} duplicate/overlapping suggestions`);
 
     // Generate essay score using second AI call
     const scorePrompt = `Based on the essay analysis, provide detailed quality scores.

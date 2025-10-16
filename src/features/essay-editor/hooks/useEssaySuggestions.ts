@@ -107,10 +107,28 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
       // Adjust subsequent suggestions based on normalized length difference
       const normalizedDiff = normalizeClient(suggestedText).length - (targetEndNorm - targetStartNorm);
 
-      if (normalizedDiff !== 0) {
-        const updatedSuggestions = suggestions.map(s => {
-          if (s.id === suggestion.id) return s;
-          // Only adjust suggestions that start after the current normalized end position
+      // Always update suggestions after applying one
+      const updatedSuggestions = suggestions
+        .filter(s => {
+          // Remove the applied suggestion
+          if (s.id === suggestion.id) return false;
+          
+          // Remove any suggestions that overlap with the applied change
+          const overlaps = (
+            (s.location.start >= targetStartNorm && s.location.start < targetEndNorm) || // Starts within
+            (s.location.end > targetStartNorm && s.location.end <= targetEndNorm) || // Ends within
+            (s.location.start < targetStartNorm && s.location.end > targetEndNorm) // Contains
+          );
+          
+          if (overlaps) {
+            console.log(`Removing overlapping suggestion ${s.id} at ${s.location.start}-${s.location.end}`);
+            return false;
+          }
+          
+          return true;
+        })
+        .map(s => {
+          // Adjust positions for suggestions that come after
           if (s.location.start >= targetEndNorm) {
             return {
               ...s,
@@ -122,8 +140,8 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
           }
           return s;
         });
-        setSuggestions(updatedSuggestions);
-      }
+
+      setSuggestions(updatedSuggestions);
 
       // Track the action
       analyticsService.trackSuggestionAction(
