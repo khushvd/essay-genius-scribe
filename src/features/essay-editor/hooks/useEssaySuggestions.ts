@@ -25,7 +25,7 @@ interface UseEssaySuggestionsResult {
   suggestions: EssaySuggestion[];
   appliedSuggestions: Set<string>;
   setSuggestions: (suggestions: EssaySuggestion[]) => void;
-  applySuggestion: (suggestion: EssaySuggestion, content: string, setContent: (content: string) => void) => void;
+  applySuggestion: (suggestion: EssaySuggestion, content: string, setContent: (content: string) => void) => boolean;
   dismissSuggestion: (suggestionId: string) => void;
 }
 
@@ -37,7 +37,7 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
     suggestion: EssaySuggestion,
     content: string,
     setContent: (content: string) => void
-  ) => {
+  ): boolean => {
     try {
       const { start, end } = suggestion.location;
       const { suggestion: suggestedText, originalText } = suggestion;
@@ -49,7 +49,7 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
 
       if (currentNormalized !== normalizedOriginal) {
         toast.error('Cannot apply suggestion - the text has changed');
-        return;
+        return false;
       }
 
       // Find the actual original indices corresponding to the normalized range
@@ -92,7 +92,7 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
 
       if (actualStart === -1) {
         toast.error('Cannot apply suggestion - the text has changed');
-        return;
+        return false;
       }
 
       // Apply the replacement on the original (unnormalized) content
@@ -155,9 +155,11 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
       );
 
       toast.success('Suggestion applied');
+      return true;
     } catch (error) {
       console.error('Error applying suggestion:', error);
       toast.error('Failed to apply suggestion');
+      return false;
     }
   }, [essayId, suggestions]);
 

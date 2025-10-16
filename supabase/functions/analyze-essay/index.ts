@@ -663,11 +663,17 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
         .replace(/–/g, '-') // Replace en dash
         .trim();
 
+      // Extract originalText directly from normalized content at the suggested range
+      const { start, end } = s.location;
+      const safeStart = Math.max(0, Math.min(start, normalizedContent.length));
+      const safeEnd = Math.max(safeStart, Math.min(end, normalizedContent.length));
+      const authoritativeOriginalText = normalizedContent.substring(safeStart, safeEnd);
+
       return {
         id: `${Date.now()}-${idx}`,
         ...s,
         suggestion: cleanSuggestion,
-        originalText: normalizeContent(s.originalText || '') // Normalize before validation
+        originalText: authoritativeOriginalText // Use slice from normalized content, not AI's text
       };
     });
 

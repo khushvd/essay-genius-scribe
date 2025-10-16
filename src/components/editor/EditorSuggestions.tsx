@@ -38,7 +38,7 @@ interface EditorSuggestionsProps {
   programmeId: string;
   cvData: any;
   englishVariant: "british" | "american";
-  onApplySuggestion: (suggestion: Suggestion) => void;
+  onApplySuggestion: (suggestion: Suggestion) => boolean;
   collegeName?: string;
   programmeName?: string;
   onSuggestionsUpdate?: (suggestions: Suggestion[]) => void;
@@ -209,13 +209,14 @@ const EditorSuggestions = ({
   };
 
   const handleApply = async (suggestion: Suggestion) => {
-    onApplySuggestion(suggestion);
+    const success = onApplySuggestion(suggestion);
     
-    // Remove from suggestions list
-    onSuggestionsUpdate?.(suggestions.filter((s) => s.id !== suggestion.id));
-
-    // Track analytics
-    await trackSuggestionAction(suggestion, 'applied');
+    // Only remove from suggestions list if apply succeeded
+    if (success) {
+      onSuggestionsUpdate?.(suggestions.filter((s) => s.id !== suggestion.id));
+      // Track analytics
+      await trackSuggestionAction(suggestion, 'applied');
+    }
   };
 
   const handleDismiss = async (suggestionId: string) => {

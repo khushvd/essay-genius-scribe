@@ -69,8 +69,8 @@ const Editor = () => {
     }
   };
 
-  const handleApplySuggestion = (suggestion: any) => {
-    applySuggestion(suggestion, content, setContent);
+  const handleApplySuggestion = (suggestion: any): boolean => {
+    return applySuggestion(suggestion, content, setContent);
   };
 
   const sanitizeFilename = (value: string | null | undefined): string => {

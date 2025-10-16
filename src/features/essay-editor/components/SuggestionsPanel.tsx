@@ -11,7 +11,7 @@ interface SuggestionsPanelProps {
   englishVariant: 'american' | 'british';
   collegeName?: string;
   programmeName?: string;
-  onApply: (suggestion: any) => void;
+  onApply: (suggestion: any) => boolean;
   onSuggestionsUpdate: (suggestions: any[]) => void;
   appliedSuggestions: Set<string>;
 }
