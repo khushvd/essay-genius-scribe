@@ -8,11 +8,12 @@ import { X } from "lucide-react";
 interface Suggestion {
   id: string;
   type: "critical" | "enhancement" | "personalization";
-  location: { start: number; end: number };
   originalText: string;
-  issue: string;
   suggestion: string;
+  issue: string;
   reasoning: string;
+  contextBefore: string;
+  contextAfter: string;
 }
 
 interface EditorPreviewProps {
@@ -55,16 +56,34 @@ export const EditorPreview = ({
       return <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{content}</p>;
     }
 
-    const sortedSuggestions = [...activeSuggestions].sort((a, b) => a.location.start - b.location.start);
+    // Find positions for each suggestion dynamically
+    const suggestionsWithPositions = activeSuggestions
+      .map(suggestion => {
+        const { originalText, contextBefore, contextAfter } = suggestion;
+        const searchPattern = contextBefore + originalText + contextAfter;
+        const patternIndex = content.indexOf(searchPattern);
+        
+        if (patternIndex === -1) {
+          return null; // Text not found (stale suggestion)
+        }
+        
+        const start = patternIndex + contextBefore.length;
+        const end = start + originalText.length;
+        
+        return { ...suggestion, start, end };
+      })
+      .filter((s): s is Suggestion & { start: number; end: number } => s !== null)
+      .sort((a, b) => a.start - b.start);
     
+    if (suggestionsWithPositions.length === 0) {
+      return <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{content}</p>;
+    }
+
     const result: JSX.Element[] = [];
     let lastIndex = 0;
 
-    sortedSuggestions.forEach((suggestion, idx) => {
-      const start = suggestion.location.start;
-      const end = suggestion.location.end;
-
-      if (start < 0 || end > content.length || start >= end) return;
+    suggestionsWithPositions.forEach((suggestion, idx) => {
+      const { start, end } = suggestion;
 
       // Add text before highlight
       if (lastIndex < start) {

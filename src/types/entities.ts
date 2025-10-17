@@ -93,15 +93,15 @@ export interface EssayScore {
 
 export interface EssaySuggestion {
   id: string;
-  type: 'grammar' | 'clarity' | 'structure' | 'content' | 'style';
+  type: 'critical' | 'enhancement' | 'personalization';
   originalText: string;
   suggestion: string;
+  issue: string;
   reasoning: string;
-  location: {
-    start: number;
-    end: number;
-  };
-  severity: 'high' | 'medium' | 'low';
+  evidence: string;
+  contextBefore: string;
+  contextAfter: string;
+  severity?: 'high' | 'medium' | 'low';
 }
 
 export interface EssayAnalytics {

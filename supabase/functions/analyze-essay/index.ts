@@ -449,6 +449,12 @@ Your task: Analyze the essay and provide specific, actionable feedback organized
 2. ENHANCEMENT: Suggestions to strengthen impact (better word choice, tighter phrasing, stronger examples)
 3. PERSONALIZATION: Opportunities to add unique voice or connect to CV/profile data
 
+IMPORTANT: For each suggestion, provide context to locate the text:
+- Identify the exact text that needs attention (originalText)
+- Provide 20-30 characters immediately BEFORE this text (contextBefore)
+- Provide 20-30 characters immediately AFTER this text (contextAfter)
+- This context must be unique enough to locate the text even if the essay is edited
+
 Base your feedback on patterns from successful essays provided in the context.`;
 
     const collegeContext = customCollegeName 
@@ -484,7 +490,9 @@ ESSAY TO ANALYZE:
 ${normalizedContent}
 
 Please analyze this essay and provide editorial feedback with a humanised, conversational tone. For each suggestion, identify:
-- The exact text that needs attention (with character positions)
+- The exact text that needs attention (originalText)
+- 20-30 characters immediately before this text (contextBefore)
+- 20-30 characters immediately after this text (contextAfter)
 - What the issue is
 - A specific suggested rewrite (ensure it sounds natural and human, not robotic)
 - Why this matters (based on successful essay patterns)
@@ -511,21 +519,24 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
                       enum: ['critical', 'enhancement', 'personalization'],
                       description: 'Type of suggestion'
                     },
-                    location: {
-                      type: 'object',
-                      properties: {
-                        start: { type: 'number' },
-                        end: { type: 'number' }
-                      },
-                      required: ['start', 'end']
+                    originalText: { 
+                      type: 'string',
+                      description: 'The exact text that needs to be changed'
                     },
-                    originalText: { type: 'string' },
+                    contextBefore: { 
+                      type: 'string',
+                      description: 'The 20-30 characters immediately before originalText'
+                    },
+                    contextAfter: { 
+                      type: 'string',
+                      description: 'The 20-30 characters immediately after originalText'
+                    },
                     issue: { type: 'string' },
                     suggestion: { type: 'string' },
                     reasoning: { type: 'string' },
                     evidence: { type: 'string' }
                   },
-                  required: ['type', 'location', 'originalText', 'issue', 'suggestion', 'reasoning', 'evidence'],
+                  required: ['type', 'originalText', 'contextBefore', 'contextAfter', 'issue', 'suggestion', 'reasoning', 'evidence'],
                   additionalProperties: false
                 }
               }
@@ -663,70 +674,20 @@ ${questionnaireData ? '\n- How this connects to the student\'s background and go
         .replace(/–/g, '-') // Replace en dash
         .trim();
 
-      // Extract originalText directly from normalized content at the suggested range
-      const { start, end } = s.location;
-      const safeStart = Math.max(0, Math.min(start, normalizedContent.length));
-      const safeEnd = Math.max(safeStart, Math.min(end, normalizedContent.length));
-      const authoritativeOriginalText = normalizedContent.substring(safeStart, safeEnd);
-
       return {
         id: `${Date.now()}-${idx}`,
-        ...s,
+        type: s.type,
+        originalText: s.originalText || '',
         suggestion: cleanSuggestion,
-        originalText: authoritativeOriginalText // Use slice from normalized content, not AI's text
+        issue: s.issue || '',
+        reasoning: s.reasoning || '',
+        evidence: s.evidence || '',
+        contextBefore: s.contextBefore || '',
+        contextAfter: s.contextAfter || ''
       };
     });
 
-    // Validate suggestion positions (bounds-only, no text matching)
-    const validateSuggestion = (s: any, essayContent: string): boolean => {
-      const { start, end } = s.location;
-      
-      if (start < 0 || end > essayContent.length || start >= end) {
-        console.warn(`[${requestId}] Invalid bounds: start=${start}, end=${end}, length=${essayContent.length}`);
-        return false;
-      }
-      
-      return true;
-    };
-
-    const validatedSuggestions = suggestionsWithIds.filter((s: any) => validateSuggestion(s, normalizedContent));
-    console.log(`[${requestId}] Filtered ${suggestionsWithIds.length - validatedSuggestions.length} invalid suggestions`);
-
-    // Deduplicate and remove overlapping suggestions
-    const acceptedSuggestions: any[] = [];
-    const deduplicatedSuggestions = validatedSuggestions.filter((s: any) => {
-      const { start: currentStart, end: currentEnd } = s.location;
-      
-      // Check if this suggestion overlaps with any already-accepted suggestion
-      for (const existing of acceptedSuggestions) {
-        const { start: existingStart, end: existingEnd } = existing.location;
-        
-        // Check for overlap:
-        // 1. Current is fully contained within existing
-        if (currentStart >= existingStart && currentEnd <= existingEnd) {
-          console.log(`[${requestId}] Skipping suggestion ${currentStart}-${currentEnd} (contained in ${existingStart}-${existingEnd})`);
-          return false;
-        }
-        
-        // 2. Existing is fully contained within current
-        if (existingStart >= currentStart && existingEnd <= currentEnd) {
-          console.log(`[${requestId}] Skipping suggestion ${currentStart}-${currentEnd} (contains ${existingStart}-${existingEnd})`);
-          return false;
-        }
-        
-        // 3. Partial overlap (any overlap at all)
-        if (currentStart < existingEnd && currentEnd > existingStart) {
-          console.log(`[${requestId}] Skipping suggestion ${currentStart}-${currentEnd} (overlaps with ${existingStart}-${existingEnd})`);
-          return false;
-        }
-      }
-      
-      // No overlap detected, accept this suggestion
-      acceptedSuggestions.push(s);
-      return true;
-    });
-
-    console.log(`[${requestId}] Removed ${validatedSuggestions.length - deduplicatedSuggestions.length} duplicate/overlapping suggestions`);
+    console.log(`[${requestId}] Generated ${suggestionsWithIds.length} context-based suggestions`);
 
     // Generate essay score using second AI call
     const scorePrompt = `Based on the essay analysis, provide detailed quality scores.
@@ -803,20 +764,18 @@ Provide detailed reasoning with specific examples from the essay to justify each
       // Don't fail the entire request if scoring fails
     }
 
-    console.log(`[${requestId}] Analysis complete. Returning ${deduplicatedSuggestions.length} suggestions`);
+    console.log(`[${requestId}] Analysis complete. Returning ${suggestionsWithIds.length} suggestions`);
 
     return new Response(
       JSON.stringify({ 
-        suggestions: deduplicatedSuggestions,
+        suggestions: suggestionsWithIds,
         analysisId,
         mode,
         metadata: {
           model: modelUsed,
           collegeTier,
           validationStats: {
-            original: suggestionsWithIds.length,
-            afterValidation: validatedSuggestions.length,
-            afterDeduplication: deduplicatedSuggestions.length
+            generated: suggestionsWithIds.length
           }
         }
       }),

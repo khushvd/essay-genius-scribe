@@ -346,7 +346,12 @@ export const TrainingDataReview = () => {
                           <div className="flex items-center justify-between">
                             <Badge variant="outline">{suggestion.type || "Edit"}</Badge>
                             <span className="text-xs text-muted-foreground">
-                              Position: {suggestion.location?.start}-{suggestion.location?.end}
+                              {suggestion.location 
+                                ? `Position: ${suggestion.location.start}-${suggestion.location.end}`
+                                : suggestion.contextBefore 
+                                  ? `Context: "${suggestion.contextBefore.slice(-10)}...${suggestion.contextAfter.slice(0, 10)}"`
+                                  : 'Context-based suggestion'
+                              }
                             </span>
                           </div>
                           <div className="grid md:grid-cols-2 gap-4">

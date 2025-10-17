@@ -22,12 +22,13 @@ const generateContentHash = (content: string): string => {
 interface Suggestion {
   id: string;
   type: "critical" | "enhancement" | "personalization";
-  location: { start: number; end: number };
   originalText: string;
   issue: string;
   suggestion: string;
   reasoning: string;
   evidence: string;
+  contextBefore: string;
+  contextAfter: string;
 }
 
 interface EditorSuggestionsProps {

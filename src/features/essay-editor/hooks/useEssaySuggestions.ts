@@ -4,23 +4,6 @@ import { analyticsService } from '@/services/analytics.service';
 import { toast } from 'sonner';
 import type { EssaySuggestion } from '@/types/entities';
 
-// Normalize text to handle Unicode differences (mirrors server normalization)
-const normalizeClient = (text: string): string => {
-  return text
-    .normalize('NFD').normalize('NFC')
-    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
-    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
-    .replace(/[\u2010-\u2015]/g, '-')
-    .replace(/—/g, '-')
-    .replace(/–/g, '-')
-    .replace(/…/g, '...')
-    .replace(/\.\.\.\./g, '...')
-    .replace(/\u00A0/g, ' ')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
-
 interface UseEssaySuggestionsResult {
   suggestions: EssaySuggestion[];
   appliedSuggestions: Set<string>;
@@ -39,111 +22,38 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
     setContent: (content: string) => void
   ): boolean => {
     try {
-      const { start, end } = suggestion.location;
-      const { suggestion: suggestedText, originalText } = suggestion;
+      const { originalText, suggestion: suggestedText, contextBefore, contextAfter } = suggestion;
 
-      // Validate against normalized content and map to original indices
-      const normalizedContent = normalizeClient(content);
-      const normalizedOriginal = normalizeClient(originalText);
-      const currentNormalized = normalizedContent.substring(start, end);
-
-      if (currentNormalized !== normalizedOriginal) {
-        toast.error('Cannot apply suggestion - the text has changed');
+      // Build search pattern: contextBefore + originalText + contextAfter
+      const searchPattern = contextBefore + originalText + contextAfter;
+      
+      // Find the text in current content
+      const patternIndex = content.indexOf(searchPattern);
+      
+      if (patternIndex === -1) {
+        // Text not found - silently remove the suggestion (Grammarly-style)
+        console.log(`Suggestion ${suggestion.id} no longer applicable - text changed`);
+        setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
         return false;
       }
 
-      // Find the actual original indices corresponding to the normalized range
-      const targetStartNorm = start;
-      const targetEndNorm = end;
+      // Calculate exact positions
+      const startIndex = patternIndex + contextBefore.length;
+      const endIndex = startIndex + originalText.length;
 
-      // Helper: binary search approximate original start based on normalized prefix length
-      const normalizedPrefixLenAt = (idx: number) => normalizeClient(content.substring(0, idx)).length;
-      let lo = 0, hi = content.length;
-      while (lo < hi) {
-        const mid = Math.floor((lo + hi) / 2);
-        const len = normalizedPrefixLenAt(mid);
-        if (len < targetStartNorm) lo = mid + 1; else hi = mid;
-      }
-      const approxStart = Math.max(0, Math.min(content.length, lo));
-
-      // Search a small window around the approximate start to find exact span by normalization
-      const windowRadius = 80;
-      const windowStart = Math.max(0, approxStart - windowRadius);
-      const windowEnd = Math.min(content.length, approxStart + windowRadius);
-
-      let actualStart = -1;
-      let actualEnd = -1;
-      outer: for (let i = windowStart; i <= windowEnd; i++) {
-        // Expand end index until we match the normalized target segment
-        const maxSegment = Math.min(content.length, i + Math.max(normalizedOriginal.length * 3, 64));
-        for (let j = i + 1; j <= maxSegment; j++) {
-          const segNorm = normalizeClient(content.substring(i, j));
-          if (segNorm === normalizedOriginal) {
-            actualStart = i;
-            actualEnd = j;
-            break outer;
-          }
-          // Early stop if we've already exceeded expected normalized length by a lot
-          if (segNorm.length > normalizedOriginal.length + 8 && !normalizedOriginal.startsWith(segNorm)) {
-            break;
-          }
-        }
-      }
-
-      if (actualStart === -1) {
-        toast.error('Cannot apply suggestion - the text has changed');
-        return false;
-      }
-
-      // Apply the replacement on the original (unnormalized) content
+      // Apply the replacement
       const newContent =
-        content.substring(0, actualStart) +
+        content.substring(0, startIndex) +
         suggestedText +
-        content.substring(actualEnd);
+        content.substring(endIndex);
 
       setContent(newContent);
       setAppliedSuggestions(prev => new Set(prev).add(suggestion.id));
 
-      // Adjust subsequent suggestions based on normalized length difference
-      const normalizedDiff = normalizeClient(suggestedText).length - (targetEndNorm - targetStartNorm);
+      // Remove the applied suggestion from the list
+      setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
 
-      // Always update suggestions after applying one
-      const updatedSuggestions = suggestions
-        .filter(s => {
-          // Remove the applied suggestion
-          if (s.id === suggestion.id) return false;
-          
-          // Remove any suggestions that overlap with the applied change
-          const overlaps = (
-            (s.location.start >= targetStartNorm && s.location.start < targetEndNorm) || // Starts within
-            (s.location.end > targetStartNorm && s.location.end <= targetEndNorm) || // Ends within
-            (s.location.start < targetStartNorm && s.location.end > targetEndNorm) // Contains
-          );
-          
-          if (overlaps) {
-            console.log(`Removing overlapping suggestion ${s.id} at ${s.location.start}-${s.location.end}`);
-            return false;
-          }
-          
-          return true;
-        })
-        .map(s => {
-          // Adjust positions for suggestions that come after
-          if (s.location.start >= targetEndNorm) {
-            return {
-              ...s,
-              location: {
-                start: s.location.start + normalizedDiff,
-                end: s.location.end + normalizedDiff
-              }
-            };
-          }
-          return s;
-        });
-
-      setSuggestions(updatedSuggestions);
-
-      // Track the action
+      // Track analytics
       analyticsService.trackSuggestionAction(
         essayId,
         suggestion.id,
@@ -158,7 +68,8 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
       return true;
     } catch (error) {
       console.error('Error applying suggestion:', error);
-      toast.error('Failed to apply suggestion');
+      // Silently remove problematic suggestion
+      setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
       return false;
     }
   }, [essayId, suggestions]);
