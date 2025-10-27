@@ -29,14 +29,26 @@ serve(async (req) => {
     const systemPrompt = `You are an expert at analyzing winning college essays with access to web search capabilities. Extract structured data from the provided documents.
 
 Your task:
-1. Identify the essay title (infer from content if not explicit)
-2. Extract college/university name - USE YOUR WEB SEARCH to verify and find the official full name if needed
-3. Extract programme/major name - USE YOUR WEB SEARCH to verify this programme exists at the college
-4. Determine degree level (bachelors or masters)
-5. Summarize the writer's background from the resume
-6. Structure the questionnaire responses as key-value pairs
-7. Identify 3-5 key strategies that made this essay successful
-8. Suggest a performance score (0-100) based on quality
+1. DETECT how many essay prompts/responses are in the document (could be 1 or more)
+2. For EACH essay, extract:
+   - The prompt/question being answered
+   - The essay title (infer from content if not explicit)
+   - The full essay content/response
+   - Word count
+3. Extract document-level metadata (shared across all essays):
+   - College/university name - USE YOUR WEB SEARCH to verify and find the official full name
+   - Programme/major name - USE YOUR WEB SEARCH to verify this programme exists at the college
+   - Degree level (bachelors or masters)
+   - Writer's background from resume (if present)
+   - Questionnaire responses as key-value pairs (if present)
+4. Identify 3-5 key strategies that made these essays successful
+5. Suggest a performance score (0-100) based on quality
+
+CRITICAL for multi-essay documents:
+- Look for clear prompt questions or headers that indicate separate essays
+- Common patterns: "Essay 1:", "Question:", "Prompt:", numbered sections
+- Each essay should have its distinct prompt and response
+- If there's only one essay, return an array with one item
 
 CRITICAL: For college and programme names:
 - If the name seems abbreviated or informal, search for the official full name
@@ -71,17 +83,35 @@ Extract and structure all relevant data from these documents.`;
           type: 'function',
           function: {
             name: 'extract_portfolio_data',
-            description: 'Extract structured data from winning essay documents',
+            description: 'Extract structured data from winning essay documents (supports multiple essays)',
             parameters: {
               type: 'object',
               properties: {
-                essay_title: {
-                  type: 'string',
-                  description: 'The title of the essay, inferred if not explicit'
-                },
-                essay_content: {
-                  type: 'string',
-                  description: 'The full essay text, cleaned'
+                essays: {
+                  type: 'array',
+                  description: 'Array of all essay prompts/responses found in the document',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      prompt_question: {
+                        type: 'string',
+                        description: 'The essay prompt or question being answered'
+                      },
+                      essay_title: {
+                        type: 'string',
+                        description: 'The title of the essay, inferred if not explicit'
+                      },
+                      essay_content: {
+                        type: 'string',
+                        description: 'The full essay text/response'
+                      },
+                      word_count: {
+                        type: 'integer',
+                        description: 'Number of words in this essay'
+                      }
+                    },
+                    required: ['prompt_question', 'essay_title', 'essay_content', 'word_count']
+                  }
                 },
                 college_name: {
                   type: 'string',
@@ -108,7 +138,7 @@ Extract and structure all relevant data from these documents.`;
                 key_strategies: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: 'Array of 3-5 key strategies that made this essay successful'
+                  description: 'Array of 3-5 key strategies that made these essays successful'
                 },
                 suggested_score: {
                   type: 'integer',
@@ -129,7 +159,7 @@ Extract and structure all relevant data from these documents.`;
                   description: 'Whether the programme name was verified via web search'
                 }
               },
-              required: ['essay_title', 'essay_content', 'college_name', 'programme_name', 'degree_level', 'key_strategies', 'suggested_score', 'search_used']
+              required: ['essays', 'college_name', 'programme_name', 'degree_level', 'key_strategies', 'suggested_score', 'search_used']
             }
           }
         }],
@@ -208,7 +238,17 @@ Extract and structure all relevant data from these documents.`;
     }
 
     const responseData = {
-      ...extractedData,
+      essays: extractedData.essays || [],
+      college_name: extractedData.college_name,
+      programme_name: extractedData.programme_name,
+      degree_level: extractedData.degree_level,
+      writer_resume: extractedData.writer_resume,
+      writer_questionnaire: extractedData.writer_questionnaire,
+      key_strategies: extractedData.key_strategies,
+      suggested_score: extractedData.suggested_score,
+      search_used: extractedData.search_used,
+      college_name_verified: extractedData.college_name_verified,
+      programme_name_verified: extractedData.programme_name_verified,
       college_id,
       programme_id,
       college_matches,

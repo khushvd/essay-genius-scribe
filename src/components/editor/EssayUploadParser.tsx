@@ -12,25 +12,30 @@ import * as pdfjsLib from "pdfjs-dist";
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ParsedEssayData {
-  title: string;
-  content: string;
-  collegeName?: string;
-  programmeName?: string;
-  collegeId?: string;
-  programmeId?: string;
+  essays: Array<{
+    prompt_question: string;
+    essay_title: string;
+    essay_content: string;
+    word_count: number;
+  }>;
+  college_name?: string;
+  programme_name?: string;
+  college_id?: string;
+  programme_id?: string;
+  degree_level?: 'bachelors' | 'masters';
   collegeMatches?: Array<{ id: string; name: string; country: string }>;
   programmeMatches?: Array<{ id: string; name: string }>;
   searchUsed?: boolean;
   collegeNameVerified?: boolean;
   programmeNameVerified?: boolean;
-  degreeLevel?: 'bachelors' | 'masters';
 }
 
 interface EssayUploadParserProps {
   onParsed: (data: ParsedEssayData) => void;
+  autoParseOnUpload?: boolean;
 }
 
-export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
+export const EssayUploadParser = ({ onParsed, autoParseOnUpload = false }: EssayUploadParserProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
 
@@ -62,7 +67,7 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
     return extractedText;
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (selectedFile.size > 5 * 1024 * 1024) {
@@ -70,19 +75,19 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
         return;
       }
       setFile(selectedFile);
+      
+      // Auto-parse if enabled
+      if (autoParseOnUpload) {
+        await parseFile(selectedFile);
+      }
     }
   };
 
-  const handleParse = async () => {
-    if (!file) {
-      toast.error("Please select a file first");
-      return;
-    }
-
+  const parseFile = async (fileToParse: File) => {
     setParsing(true);
     try {
       // Extract text from file
-      const extractedText = await extractTextFromFile(file);
+      const extractedText = await extractTextFromFile(fileToParse);
 
       if (!extractedText.trim()) {
         toast.error("Could not extract text from file");
@@ -105,30 +110,37 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
 
       // Parse the response
       const parsedData: ParsedEssayData = {
-        title: data.essay_title || "",
-        content: data.essay_content || extractedText,
-        collegeName: data.college_name,
-        programmeName: data.programme_name,
-        collegeId: data.college_id,
-        programmeId: data.programme_id,
+        essays: data.essays || [],
+        college_name: data.college_name,
+        programme_name: data.programme_name,
+        college_id: data.college_id,
+        programme_id: data.programme_id,
+        degree_level: data.degree_level,
         collegeMatches: data.college_matches || [],
         programmeMatches: data.programme_matches || [],
         searchUsed: data.search_used,
         collegeNameVerified: data.college_name_verified,
         programmeNameVerified: data.programme_name_verified,
-        degreeLevel: data.degree_level,
       };
 
       onParsed(parsedData);
       
       const verifiedText = data.search_used ? " (Verified via web search)" : "";
-      toast.success(`Essay parsed successfully!${verifiedText}`);
+      toast.success(`Document parsed successfully!${verifiedText}`);
     } catch (error: any) {
       console.error("Parse error:", error);
       toast.error(error.message || "Failed to parse essay");
     } finally {
       setParsing(false);
     }
+  };
+
+  const handleParse = async () => {
+    if (!file) {
+      toast.error("Please select a file first");
+      return;
+    }
+    await parseFile(file);
   };
 
   return (
@@ -138,7 +150,7 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
           Upload Essay Document
         </Label>
         <p className="text-sm text-muted-foreground mb-3">
-          Upload your essay (PDF or DOCX) and automatically extract the content and metadata
+          Upload your essay document (PDF or DOCX). {autoParseOnUpload ? 'It will be parsed automatically.' : 'Click Parse to extract content.'}
         </p>
 
         {file ? (
@@ -178,7 +190,7 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
         )}
       </div>
 
-      {file && (
+      {file && !autoParseOnUpload && (
         <Button
           type="button"
           onClick={handleParse}
@@ -197,6 +209,13 @@ export const EssayUploadParser = ({ onParsed }: EssayUploadParserProps) => {
             </>
           )}
         </Button>
+      )}
+
+      {parsing && (
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Parsing document...
+        </div>
       )}
     </div>
   );
