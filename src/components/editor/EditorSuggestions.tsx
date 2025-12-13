@@ -259,8 +259,8 @@ const EditorSuggestions = ({
     : "Generic feedback mode";
 
   return (
-    <div className="h-full flex flex-col bg-card border-l border-border">
-      <div className="p-4 border-b border-border">
+    <div className="h-full flex flex-col">
+      <div className="p-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <FileEdit className="w-5 h-5 text-primary" />

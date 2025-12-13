@@ -86,9 +86,15 @@ const SuggestionCard = ({ suggestion, onApply, onDismiss, isApplied }: Suggestio
           </p>
         </div>
 
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p><span className="font-semibold">Why:</span> {suggestion.reasoning}</p>
-          <p><span className="font-semibold">Evidence:</span> {suggestion.evidence}</p>
+        <div className="text-xs text-muted-foreground space-y-1.5">
+          <p className="line-clamp-3">
+            <span className="font-semibold">Why:</span> {suggestion.reasoning}
+          </p>
+          {suggestion.evidence && (
+            <p className="line-clamp-2">
+              <span className="font-semibold">Evidence:</span> {suggestion.evidence}
+            </p>
+          )}
         </div>
       </div>
     </Card>

@@ -215,17 +215,25 @@ export const EssayScoreCard = ({ essayId, content, collegeId, programmeId, cvDat
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="text-center">
-          <button
-            onClick={() => setReasoningExpanded(!reasoningExpanded)}
-            className={`text-4xl font-bold ${getScoreColor(latestScore.overall_score || 0)} cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center gap-2 mx-auto`}
-          >
+        <div className="text-center space-y-2">
+          <span className={`text-4xl font-bold ${getScoreColor(latestScore.overall_score || 0)}`}>
             {latestScore.overall_score || 0}
-            {latestScore.ai_reasoning && (
-              reasoningExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />
-            )}
-          </button>
-          <p className="text-xs text-muted-foreground mt-1">Overall Score {latestScore.ai_reasoning && '(click to expand)'}</p>
+          </span>
+          <p className="text-xs text-muted-foreground">Overall Score</p>
+          {latestScore.ai_reasoning && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setReasoningExpanded(!reasoningExpanded)}
+              className="text-xs h-7"
+            >
+              {reasoningExpanded ? (
+                <>Hide Reasoning <ChevronUp className="w-3 h-3 ml-1" /></>
+              ) : (
+                <>View Reasoning <ChevronDown className="w-3 h-3 ml-1" /></>
+              )}
+            </Button>
+          )}
         </div>
 
         {latestScore.clarity_score && (

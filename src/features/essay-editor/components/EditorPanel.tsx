@@ -13,21 +13,24 @@ export const EditorPanel = ({ content, onChange }: EditorPanelProps) => {
   const hasMinContent = content.length >= 50;
 
   return (
-    <div className="bg-card rounded-2xl shadow-soft border border-border p-4 md:p-8">
-      <h3 className="text-sm font-medium text-muted-foreground mb-3">Editor</h3>
-      <Textarea
-        ref={textareaRef}
-        value={content}
-        onChange={(e) => onChange(e.target.value)}
-        className="min-h-[500px] font-mono text-sm leading-relaxed resize-none border-0 focus-visible:ring-0 p-0"
-        placeholder="Write your essay here..."
-        style={{ backgroundColor: 'transparent' }}
-      />
-      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-4 pt-4 border-t border-border">
+    <div className="bg-card rounded-xl shadow-soft border border-border flex flex-col h-full min-h-[400px] max-h-[70vh]">
+      <div className="p-4 pb-0">
+        <h3 className="text-sm font-medium text-muted-foreground">Editor</h3>
+      </div>
+      <div className="flex-1 p-4 pt-3 min-h-0 overflow-hidden">
+        <Textarea
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-full min-h-[280px] font-mono text-sm leading-relaxed resize-none border-0 focus-visible:ring-0 p-0 bg-transparent"
+          placeholder="Write your essay here..."
+        />
+      </div>
+      <div className="flex items-center gap-4 text-sm text-muted-foreground p-4 pt-0 border-t border-border mt-auto">
         <span>{content.length} characters</span>
-        <span>•</span>
+        <span className="text-border">•</span>
         <span>{wordCount} words</span>
-        <span>•</span>
+        <span className="text-border">•</span>
         <Badge variant={hasMinContent ? "secondary" : "outline"}>
           {hasMinContent ? "Ready for feedback" : "Add more content"}
         </Badge>

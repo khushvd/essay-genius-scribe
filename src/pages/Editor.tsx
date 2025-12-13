@@ -198,10 +198,11 @@ const Editor = () => {
           isSubmittingTraining={isSubmittingTraining}
         />
 
-      <main className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-auto">
-          <div className="container mx-auto px-4 py-8 max-w-7xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <main className="flex-1 flex overflow-hidden min-h-0">
+        {/* Left side: Editor + Preview */}
+        <div className="flex-1 min-w-0 overflow-y-auto">
+          <div className="container mx-auto px-4 py-6 max-w-6xl">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 auto-rows-fr">
               <EditorPanel content={content} onChange={setContent} />
               <PreviewPanel
                 content={content}
@@ -215,9 +216,8 @@ const Editor = () => {
         </div>
 
         {/* Desktop: Side Panel */}
-        <div className="w-[400px] hidden lg:flex flex-col border-l border-border overflow-y-auto">
-          <div className="p-4">
-            <SuggestionsPanel
+        <aside className="w-[380px] hidden xl:flex flex-col border-l border-border bg-card overflow-hidden">
+          <SuggestionsPanel
               suggestions={suggestions}
               essayId={id!}
               content={content}
@@ -231,13 +231,12 @@ const Editor = () => {
               onSuggestionsUpdate={setSuggestions}
               appliedSuggestions={appliedSuggestions}
             />
-          </div>
-        </div>
+        </aside>
 
         {/* Mobile: Floating Button + Drawer */}
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
           <DrawerTrigger asChild>
-            <Button className="fixed bottom-4 right-4 lg:hidden z-50 shadow-lg" size="lg">
+            <Button className="fixed bottom-4 right-4 xl:hidden z-50 shadow-lg" size="lg">
               <Sparkles className="w-4 h-4 mr-2" />
               View Feedback
             </Button>
