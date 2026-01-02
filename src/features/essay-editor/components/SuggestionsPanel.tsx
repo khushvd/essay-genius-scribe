@@ -31,29 +31,36 @@ export const SuggestionsPanel = ({
   appliedSuggestions,
 }: SuggestionsPanelProps) => {
   return (
-    <div className="space-y-4">
-      <EssayScoreCard 
-        essayId={essayId}
-        content={content}
-        collegeId={collegeId}
-        programmeId={programmeId}
-        cvData={cvData}
-        englishVariant={englishVariant}
-      />
-      <EditorSuggestions
-        suggestions={suggestions}
-        essayId={essayId}
-        content={content}
-        collegeId={collegeId}
-        programmeId={programmeId}
-        cvData={cvData}
-        englishVariant={englishVariant}
-        onApplySuggestion={onApply}
-        collegeName={collegeName}
-        programmeName={programmeName}
-        onSuggestionsUpdate={onSuggestionsUpdate}
-        appliedSuggestions={appliedSuggestions}
-      />
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Score card - fixed at top */}
+      <div className="shrink-0 p-4 border-b border-border">
+        <EssayScoreCard 
+          essayId={essayId}
+          content={content}
+          collegeId={collegeId}
+          programmeId={programmeId}
+          cvData={cvData}
+          englishVariant={englishVariant}
+        />
+      </div>
+      
+      {/* Suggestions - scrollable area */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <EditorSuggestions
+          suggestions={suggestions}
+          essayId={essayId}
+          content={content}
+          collegeId={collegeId}
+          programmeId={programmeId}
+          cvData={cvData}
+          englishVariant={englishVariant}
+          onApplySuggestion={onApply}
+          collegeName={collegeName}
+          programmeName={programmeName}
+          onSuggestionsUpdate={onSuggestionsUpdate}
+          appliedSuggestions={appliedSuggestions}
+        />
+      </div>
     </div>
   );
 };

@@ -22,24 +22,28 @@ export const useEssaySuggestions = (essayId: string): UseEssaySuggestionsResult 
     setContent: (content: string) => void
   ): boolean => {
     try {
-      const { originalText, suggestion: suggestedText, contextBefore, contextAfter } = suggestion;
+      const { originalText, suggestion: suggestedText, contextBefore = '', contextAfter = '' } = suggestion;
 
-      // Build search pattern: contextBefore + originalText + contextAfter
+      // Try with full context first
       const searchPattern = contextBefore + originalText + contextAfter;
+      let patternIndex = content.indexOf(searchPattern);
+      let startIndex: number, endIndex: number;
       
-      // Find the text in current content
-      const patternIndex = content.indexOf(searchPattern);
-      
-      if (patternIndex === -1) {
-        // Text not found - silently remove the suggestion (Grammarly-style)
-        console.log(`Suggestion ${suggestion.id} no longer applicable - text changed`);
-        setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
-        return false;
+      if (patternIndex !== -1) {
+        startIndex = patternIndex + contextBefore.length;
+        endIndex = startIndex + originalText.length;
+      } else {
+        // Fallback: search just for originalText
+        const directIndex = content.indexOf(originalText);
+        if (directIndex === -1) {
+          // Text not found - silently remove the suggestion (Grammarly-style)
+          console.log(`Suggestion ${suggestion.id} no longer applicable - text changed`);
+          setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+          return false;
+        }
+        startIndex = directIndex;
+        endIndex = directIndex + originalText.length;
       }
-
-      // Calculate exact positions
-      const startIndex = patternIndex + contextBefore.length;
-      const endIndex = startIndex + originalText.length;
 
       // Apply the replacement
       const newContent =
