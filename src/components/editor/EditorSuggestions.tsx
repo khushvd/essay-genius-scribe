@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileEdit, Loader2, RefreshCw } from "lucide-react";
@@ -290,68 +290,47 @@ const EditorSuggestions = ({
         </p>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="p-4 space-y-6">
-          {analyzing && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Analyzing...</span>
+      <div className="flex-1 relative min-h-0">
+        <div className="absolute inset-0 overflow-y-auto">
+          <div className="p-4 space-y-6">
+            {analyzing && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Analyzing...</span>
+                </div>
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
               </div>
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </div>
-          )}
-          
-          {suggestions.length === 0 && !analyzing && hasAnalyzed && (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileEdit className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">
-                Your essay looks great! No suggestions at this time.
-              </p>
-            </div>
-          )}
-          
-          {suggestions.length === 0 && !analyzing && !hasAnalyzed && content.length < 50 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileEdit className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">
-                Write at least 50 characters to get {collegeId && programmeId ? 'personalized' : 'generic'} editorial feedback.
-              </p>
-            </div>
-          )}
-
-          {groupedSuggestions.critical.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-destructive"></span>
-                Critical ({groupedSuggestions.critical.length})
-              </h3>
-              <div className="space-y-3">
-                {groupedSuggestions.critical.map((suggestion) => (
-                  <SuggestionCard
-                    key={suggestion.id}
-                    suggestion={suggestion}
-                    onApply={handleApply}
-                    onDismiss={handleDismiss}
-                    isApplied={appliedSuggestions.has(suggestion.id)}
-                  />
-                ))}
+            )}
+            
+            {suggestions.length === 0 && !analyzing && hasAnalyzed && (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileEdit className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">
+                  Your essay looks great! No suggestions at this time.
+                </p>
               </div>
-            </div>
-          )}
+            )}
+            
+            {suggestions.length === 0 && !analyzing && !hasAnalyzed && content.length < 50 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileEdit className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">
+                  Write at least 50 characters to get {collegeId && programmeId ? 'personalized' : 'generic'} editorial feedback.
+                </p>
+              </div>
+            )}
 
-          {groupedSuggestions.enhancement.length > 0 && (
-            <>
-              {groupedSuggestions.critical.length > 0 && <Separator />}
+            {groupedSuggestions.critical.length > 0 && (
               <div>
                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  Enhancement ({groupedSuggestions.enhancement.length})
+                  <span className="w-2 h-2 rounded-full bg-destructive"></span>
+                  Critical ({groupedSuggestions.critical.length})
                 </h3>
                 <div className="space-y-3">
-                  {groupedSuggestions.enhancement.map((suggestion) => (
+                  {groupedSuggestions.critical.map((suggestion) => (
                     <SuggestionCard
                       key={suggestion.id}
                       suggestion={suggestion}
@@ -362,33 +341,56 @@ const EditorSuggestions = ({
                   ))}
                 </div>
               </div>
-            </>
-          )}
+            )}
 
-          {groupedSuggestions.personalization.length > 0 && (
-            <>
-              {(groupedSuggestions.critical.length > 0 || groupedSuggestions.enhancement.length > 0) && <Separator />}
-              <div>
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  Personalization ({groupedSuggestions.personalization.length})
-                </h3>
-                <div className="space-y-3">
-                  {groupedSuggestions.personalization.map((suggestion) => (
-                    <SuggestionCard
-                      key={suggestion.id}
-                      suggestion={suggestion}
-                      onApply={handleApply}
-                      onDismiss={handleDismiss}
-                      isApplied={appliedSuggestions.has(suggestion.id)}
-                    />
-                  ))}
+            {groupedSuggestions.enhancement.length > 0 && (
+              <>
+                {groupedSuggestions.critical.length > 0 && <Separator />}
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Enhancement ({groupedSuggestions.enhancement.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {groupedSuggestions.enhancement.map((suggestion) => (
+                      <SuggestionCard
+                        key={suggestion.id}
+                        suggestion={suggestion}
+                        onApply={handleApply}
+                        onDismiss={handleDismiss}
+                        isApplied={appliedSuggestions.has(suggestion.id)}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
+
+            {groupedSuggestions.personalization.length > 0 && (
+              <>
+                {(groupedSuggestions.critical.length > 0 || groupedSuggestions.enhancement.length > 0) && <Separator />}
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Personalization ({groupedSuggestions.personalization.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {groupedSuggestions.personalization.map((suggestion) => (
+                      <SuggestionCard
+                        key={suggestion.id}
+                        suggestion={suggestion}
+                        onApply={handleApply}
+                        onDismiss={handleDismiss}
+                        isApplied={appliedSuggestions.has(suggestion.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };

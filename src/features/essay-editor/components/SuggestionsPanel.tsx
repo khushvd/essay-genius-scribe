@@ -46,23 +46,25 @@ export const SuggestionsPanel = ({
         />
       </div>
       
-      {/* Suggestions - scrollable area */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <EditorSuggestions
-          suggestions={suggestions}
-          essayId={essayId}
-          content={content}
-          collegeId={collegeId}
-          programmeId={programmeId}
-          cvData={cvData}
-          englishVariant={englishVariant}
-          onApplySuggestion={onApply}
-          collegeName={collegeName}
-          programmeName={programmeName}
-          onSuggestionsUpdate={onSuggestionsUpdate}
-          appliedSuggestions={appliedSuggestions}
-          isContentReady={isContentReady}
-        />
+      {/* Suggestions - takes remaining space */}
+      <div className="flex-1 min-h-0 relative">
+        <div className="absolute inset-0">
+          <EditorSuggestions
+            suggestions={suggestions}
+            essayId={essayId}
+            content={content}
+            collegeId={collegeId}
+            programmeId={programmeId}
+            cvData={cvData}
+            englishVariant={englishVariant}
+            onApplySuggestion={onApply}
+            collegeName={collegeName}
+            programmeName={programmeName}
+            onSuggestionsUpdate={onSuggestionsUpdate}
+            appliedSuggestions={appliedSuggestions}
+            isContentReady={isContentReady}
+          />
+        </div>
       </div>
     </div>
   );
