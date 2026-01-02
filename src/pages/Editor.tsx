@@ -217,7 +217,8 @@ const Editor = () => {
 
         {/* Desktop: Side Panel */}
         <aside className="w-[380px] hidden xl:flex flex-col border-l border-border bg-card overflow-hidden">
-          <SuggestionsPanel
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <SuggestionsPanel
               suggestions={suggestions}
               essayId={id!}
               content={content}
@@ -231,6 +232,7 @@ const Editor = () => {
               onSuggestionsUpdate={setSuggestions}
               appliedSuggestions={appliedSuggestions}
             />
+          </div>
         </aside>
 
         {/* Mobile: Floating Button + Drawer */}

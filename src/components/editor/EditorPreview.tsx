@@ -59,16 +59,25 @@ export const EditorPreview = ({
     // Find positions for each suggestion dynamically
     const suggestionsWithPositions = activeSuggestions
       .map(suggestion => {
-        const { originalText, contextBefore, contextAfter } = suggestion;
+        const { originalText, contextBefore = '', contextAfter = '' } = suggestion;
+        
+        // Try with full context first
         const searchPattern = contextBefore + originalText + contextAfter;
-        const patternIndex = content.indexOf(searchPattern);
+        let patternIndex = content.indexOf(searchPattern);
+        let start: number, end: number;
         
-        if (patternIndex === -1) {
-          return null; // Text not found (stale suggestion)
+        if (patternIndex !== -1) {
+          start = patternIndex + contextBefore.length;
+          end = start + originalText.length;
+        } else {
+          // Fallback: search just for originalText
+          const directIndex = content.indexOf(originalText);
+          if (directIndex === -1) {
+            return null; // Text truly not found
+          }
+          start = directIndex;
+          end = directIndex + originalText.length;
         }
-        
-        const start = patternIndex + contextBefore.length;
-        const end = start + originalText.length;
         
         return { ...suggestion, start, end };
       })
