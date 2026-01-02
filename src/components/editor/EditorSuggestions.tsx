@@ -44,6 +44,7 @@ interface EditorSuggestionsProps {
   programmeName?: string;
   onSuggestionsUpdate?: (suggestions: Suggestion[]) => void;
   appliedSuggestions: Set<string>;
+  isContentReady?: boolean;
 }
 
 const EditorSuggestions = ({
@@ -59,6 +60,7 @@ const EditorSuggestions = ({
   programmeName,
   onSuggestionsUpdate,
   appliedSuggestions,
+  isContentReady = true,
 }: EditorSuggestionsProps) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
@@ -67,6 +69,9 @@ const EditorSuggestions = ({
 
   // Check for existing analysis on mount
   useEffect(() => {
+    // Wait for content to be properly initialized before checking cache
+    if (!isContentReady) return;
+    
     const loadCachedAnalysis = () => {
       if (!essayId || suggestions.length > 0) return;
 
@@ -103,10 +108,13 @@ const EditorSuggestions = ({
     };
 
     loadCachedAnalysis();
-  }, [essayId, suggestions.length, content]);
+  }, [essayId, suggestions.length, content, isContentReady]);
 
   // Auto-analyze when all required data is loaded (with caching)
   useEffect(() => {
+    // Wait for content to be properly initialized
+    if (!isContentReady) return;
+    
     if (!essayId || !content.trim() || content.length < 50) {
       return;
     }
@@ -137,7 +145,7 @@ const EditorSuggestions = ({
     }
 
     handleAnalyze();
-  }, [essayId, content, collegeId, programmeId, hasAnalyzed, suggestions.length]);
+  }, [essayId, content, collegeId, programmeId, hasAnalyzed, suggestions.length, isContentReady]);
 
   const handleAnalyze = async () => {
     if (!content.trim()) {
