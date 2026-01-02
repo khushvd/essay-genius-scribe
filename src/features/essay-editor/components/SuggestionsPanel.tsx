@@ -14,6 +14,7 @@ interface SuggestionsPanelProps {
   onApply: (suggestion: any) => boolean;
   onSuggestionsUpdate: (suggestions: any[]) => void;
   appliedSuggestions: Set<string>;
+  isContentReady?: boolean;
 }
 
 export const SuggestionsPanel = ({
@@ -29,6 +30,7 @@ export const SuggestionsPanel = ({
   onApply,
   onSuggestionsUpdate,
   appliedSuggestions,
+  isContentReady,
 }: SuggestionsPanelProps) => {
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -59,6 +61,7 @@ export const SuggestionsPanel = ({
           programmeName={programmeName}
           onSuggestionsUpdate={onSuggestionsUpdate}
           appliedSuggestions={appliedSuggestions}
+          isContentReady={isContentReady}
         />
       </div>
     </div>

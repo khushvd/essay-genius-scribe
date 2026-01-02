@@ -231,6 +231,7 @@ const Editor = () => {
               onApply={handleApplySuggestion}
               onSuggestionsUpdate={setSuggestions}
               appliedSuggestions={appliedSuggestions}
+              isContentReady={isContentInitialized}
             />
           </div>
         </aside>
@@ -258,6 +259,7 @@ const Editor = () => {
                 onApply={handleApplySuggestion}
                 onSuggestionsUpdate={setSuggestions}
                 appliedSuggestions={appliedSuggestions}
+                isContentReady={isContentInitialized}
               />
             </div>
           </DrawerContent>
