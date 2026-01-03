@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, Sparkles, FileCheck, Lightbulb } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,17 @@ const loadingMessages = [
   "Finalizing editorial feedback...",
 ];
 
+// Generate a simple hash of content for caching
+const generateContentHash = (content: string): string => {
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+};
+
 export const EditorLoadingScreen = ({
   essayId,
   essayTitle,
@@ -26,6 +37,100 @@ export const EditorLoadingScreen = ({
   const [progress, setProgress] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
   const [hasAnalysis, setHasAnalysis] = useState(false);
+  const analysisTriggered = useRef(false);
+
+  // Trigger AI analysis immediately on mount
+  useEffect(() => {
+    const triggerAnalysis = async () => {
+      // Prevent duplicate calls
+      if (analysisTriggered.current) return;
+      analysisTriggered.current = true;
+
+      try {
+        // Fetch essay data to get content and other details
+        const { data: essay, error: essayError } = await supabase
+          .from("essays")
+          .select(`
+            *,
+            colleges (name, country),
+            programmes (name, english_variant)
+          `)
+          .eq("id", essayId)
+          .single();
+
+        if (essayError || !essay) {
+          console.error("Error fetching essay:", essayError);
+          return;
+        }
+
+        // Check if content is sufficient for analysis
+        if (!essay.content || essay.content.trim().length < 50) {
+          console.log("Essay content too short for analysis");
+          return;
+        }
+
+        // Check for existing analysis in cache
+        const contentHash = generateContentHash(essay.content);
+        const cacheKey = `essay_analysis_${essayId}`;
+        const cached = sessionStorage.getItem(cacheKey);
+
+        if (cached) {
+          try {
+            const cacheData = JSON.parse(cached);
+            const cacheAge = Date.now() - cacheData.timestamp;
+
+            // Use cache if valid and content hasn't changed
+            if (cacheAge < 30 * 60 * 1000 && cacheData.contentHash === contentHash) {
+              console.log("Using cached analysis");
+              setHasAnalysis(true);
+              return;
+            }
+          } catch (e) {
+            sessionStorage.removeItem(cacheKey);
+          }
+        }
+
+        // Store content hash for polling to check
+        sessionStorage.setItem(`${essayId}-content-hash`, contentHash);
+
+        // Trigger AI analysis in background
+        console.log("Triggering AI analysis for essay:", essayId);
+        supabase.functions.invoke('analyze-essay', {
+          body: {
+            essayId,
+            content: essay.content,
+            collegeId: essay.college_id,
+            programmeId: essay.programme_id,
+            cvData: essay.cv_data,
+            englishVariant: (essay.programmes?.english_variant as "american" | "british") || "american",
+            mode: 'feedback',
+          },
+        }).then(({ data, error }) => {
+          if (error) {
+            console.error("Analysis error:", error);
+          } else {
+            console.log("Analysis completed successfully");
+            // Cache the results in sessionStorage
+            if (data?.suggestions) {
+              const cacheKey = `essay_analysis_${essayId}`;
+              sessionStorage.setItem(cacheKey, JSON.stringify({
+                timestamp: Date.now(),
+                suggestions: data.suggestions,
+                contentHash: contentHash,
+                analysisId: data.analysisId || `analysis-${Date.now()}`
+              }));
+              // Trigger immediate check to transition faster
+              setHasAnalysis(true);
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Error triggering analysis:", err);
+      }
+    };
+
+    triggerAnalysis();
+  }, [essayId]);
 
   // Smooth progress animation (0-95% over ~60 seconds)
   useEffect(() => {
@@ -56,11 +161,31 @@ export const EditorLoadingScreen = ({
     const checkAnalysis = async () => {
       try {
         // Check sessionStorage cache first
-        const contentHash = sessionStorage.getItem(`${essayId}-content-hash`);
-        const cacheKey = contentHash ? `${essayId}-analyzed-${contentHash}` : null;
-        const hasCachedAnalysis = cacheKey ? sessionStorage.getItem(cacheKey) : null;
+        const cacheKey = `essay_analysis_${essayId}`;
+        const cached = sessionStorage.getItem(cacheKey);
 
-        // Check if analysis exists in essay_analytics
+        if (cached) {
+          try {
+            const cacheData = JSON.parse(cached);
+            const cacheAge = Date.now() - cacheData.timestamp;
+            // Cache valid for 30 minutes
+            if (cacheAge < 30 * 60 * 1000 && cacheData.suggestions) {
+              console.log("Analysis found in cache");
+              setHasAnalysis(true);
+              setProgress(100);
+
+              setTimeout(() => {
+                onAnalysisComplete();
+              }, 500);
+              return true;
+            }
+          } catch (e) {
+            // Invalid cache, continue checking database
+            sessionStorage.removeItem(cacheKey);
+          }
+        }
+
+        // Check if analysis exists in essay_analytics table
         const { data, error } = await supabase
           .from("essay_analytics")
           .select("id")
@@ -68,10 +193,11 @@ export const EditorLoadingScreen = ({
           .limit(1)
           .maybeSingle();
 
-        if ((!error && data) || hasCachedAnalysis) {
+        if (!error && data) {
+          console.log("Analysis found in database");
           setHasAnalysis(true);
           setProgress(100);
-          
+
           // Wait a moment to show 100% completion
           setTimeout(() => {
             onAnalysisComplete();
